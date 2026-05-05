@@ -116,10 +116,9 @@ window.MJ = (function () {
           const fullTotal = (others + 1) * basePts;
           pay = (i === d) ? fullTotal : 0;
         } else if (share === 'shooter_solo') {
-          // Discarder pays standard discarder share (2×) + each helper share (1× × (others-1))
-          // = 2× + (others-1)×, others 0
-          // 4P: 2 + 1 = 3×; 3P: 2 + 0 = 2×
-          const soloTotal = (2 + (others - 1)) * basePts;
+          // Discarder pays alone; others pay 0
+          // 4P: 3× basePts; 3P: 1.5× basePts
+          const soloTotal = (N === 3 ? 1.5 : 3) * basePts;
           pay = (i === d) ? soloTotal : 0;
         } else if (share === 'helper') {
           pay = (i === d) ? basePts * 1.5 : basePts * 0.5;
