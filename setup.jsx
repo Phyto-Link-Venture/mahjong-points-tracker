@@ -1,0 +1,157 @@
+// Setup screen: configure game mode, players, rules
+const { useState } = React;
+
+function Setup({ t, lang, onStart, initial }) {
+  const [mode, setMode] = useState(initial?.mode || 4);
+  const seatLabels = (m) => m === 3 ? [t.east, t.south, t.west] : [t.east, t.south, t.west, t.north];
+  const [names, setNames] = useState(initial?.names || ["", "", "", ""]);
+  const [minFan, setMinFan] = useState(initial?.minFan ?? 5);
+  const [maxFan, setMaxFan] = useState(initial?.maxFan ?? 10);
+  const [basePoint, setBasePoint] = useState(initial?.basePoint ?? 1);
+  const [dealerDouble, setDealerDouble] = useState(initial?.dealerDouble ?? true);
+  const [pairwiseLoser, setPairwiseLoser] = useState(initial?.pairwiseLoser ?? true);
+  const [discardShare, setDiscardShare] = useState(initial?.discardShare ?? 'standard');
+  const [flowerPts, setFlowerPts] = useState(initial?.flowerPts ?? 1);
+  const [flyPts, setFlyPts] = useState(initial?.flyPts ?? 1);
+  const [kongOpenPts, setKongOpenPts] = useState(initial?.kongOpenPts ?? 1);
+  const [kongClosedPts, setKongClosedPts] = useState(initial?.kongClosedPts ?? 2);
+
+  const seats = seatLabels(mode);
+
+  function start() {
+    const playerNames = seats.map((s, i) => names[i]?.trim() || s);
+    onStart({
+      mode, names: playerNames,
+      minFan: Number(minFan), maxFan: Number(maxFan),
+      basePoint: Number(basePoint),
+      dealerDouble, pairwiseLoser, discardShare,
+      flowerPts: Number(flowerPts), flyPts: Number(flyPts),
+      kongOpenPts: Number(kongOpenPts), kongClosedPts: Number(kongClosedPts),
+    });
+  }
+
+  return (
+    <div>
+      <div className="setup-hero">
+        <h1>{t.setupTitle}</h1>
+        <p>{t.setupSubtitle}</p>
+      </div>
+
+      <div className="section">
+        <div className="section-title">{t.gameMode}</div>
+        <div className="mode-grid">
+          <button className={"mode-card " + (mode === 3 ? "active" : "")} onClick={() => setMode(3)}>
+            <h3>{t.threePlayer}</h3>
+            <p>{t.threeDesc}</p>
+          </button>
+          <button className={"mode-card " + (mode === 4 ? "active" : "")} onClick={() => setMode(4)}>
+            <h3>{t.fourPlayer}</h3>
+            <p>{t.fourDesc}</p>
+          </button>
+        </div>
+      </div>
+
+      <div className="section">
+        <div className="section-title">{t.players}</div>
+        {seats.map((s, i) => (
+          <div className="player-input-row" key={i}>
+            <div className="seat-badge">{s}</div>
+            <input
+              type="text"
+              placeholder={`${t.playerName} ${i + 1}`}
+              value={names[i] || ""}
+              onChange={(e) => {
+                const n = [...names]; n[i] = e.target.value; setNames(n);
+              }}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="section">
+        <div className="section-title">{t.rules}</div>
+        <div className="field-row">
+          <div>
+            <div className="label">{t.minFan}</div>
+          </div>
+          <input className="num-input" type="number" value={minFan} onChange={e => setMinFan(e.target.value)} min="1" />
+        </div>
+        <div className="field-row">
+          <div>
+            <div className="label">{t.maxFan}</div>
+          </div>
+          <input className="num-input" type="number" value={maxFan} onChange={e => setMaxFan(e.target.value)} min="1" />
+        </div>
+        <div className="field-row">
+          <div>
+            <div className="label">{t.basePoint}</div>
+            <div className="hint">{t.basePointHint}{basePoint} {t.pointsLabel}/{t.fan}</div>
+          </div>
+          <input className="num-input" type="number" value={basePoint} onChange={e => setBasePoint(e.target.value)} min="1" />
+        </div>
+        <div className="field-row">
+          <div>
+            <div className="label">{t.dealerDouble}</div>
+          </div>
+          <button className={"toggle " + (dealerDouble ? "on" : "")} onClick={() => setDealerDouble(!dealerDouble)} />
+        </div>
+        <div className="field-row">
+          <div>
+            <div className="label">{t.pairwiseLoser}</div>
+            <div className="hint">{t.pairwiseLoserHint}</div>
+          </div>
+          <button className={"toggle " + (pairwiseLoser ? "on" : "")} onClick={() => setPairwiseLoser(!pairwiseLoser)} />
+        </div>
+      </div>
+
+      <div className="section">
+        <div className="section-title">{t.discardShare}</div>
+        <div className="hint" style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 10 }}>{t.discardShareHint}</div>
+        {[
+          { k: 'standard', label: t.shareStandard, desc: t.shareStandardDesc },
+          { k: 'helper', label: t.shareHelper, desc: t.shareHelperDesc },
+          { k: 'shooter_solo', label: t.shareShooter15, desc: t.shareShooter15Desc },
+          { k: 'shooter_full', label: t.shareShooter, desc: t.shareShooterDesc },
+        ].map(o => (
+          <button
+            key={o.k}
+            className={"mode-card " + (discardShare === o.k ? "active" : "")}
+            onClick={() => setDiscardShare(o.k)}
+            style={{ width: '100%', marginBottom: 8 }}
+          >
+            <h3 style={{ fontSize: 15 }}>{o.label}</h3>
+            <p>{o.desc}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="section">
+        <div className="section-title">{t.bonuses}</div>
+        <div className="field-row">
+          <div className="label">{t.flowerOwn}</div>
+          <input className="num-input" type="number" value={flowerPts} onChange={e => setFlowerPts(e.target.value)} min="0" />
+        </div>
+        {mode === 3 && (
+          <div className="field-row">
+            <div className="label">{t.fly}</div>
+            <input className="num-input" type="number" value={flyPts} onChange={e => setFlyPts(e.target.value)} min="0" />
+          </div>
+        )}
+        <div className="field-row">
+          <div className="label">{t.kongOpen}</div>
+          <input className="num-input" type="number" value={kongOpenPts} onChange={e => setKongOpenPts(e.target.value)} min="0" />
+        </div>
+        <div className="field-row">
+          <div className="label">{t.kongClosed}</div>
+          <input className="num-input" type="number" value={kongClosedPts} onChange={e => setKongClosedPts(e.target.value)} min="0" />
+        </div>
+      </div>
+
+      <button className="btn btn-primary btn-block btn-lg" onClick={start}>
+        {t.startSession} →
+      </button>
+    </div>
+  );
+}
+
+window.Setup = Setup;
