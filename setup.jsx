@@ -1,6 +1,26 @@
 // Setup screen: configure game mode, players, rules
 const { useState } = React;
 
+function CollapsibleSection({ title, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="section" style={{ marginBottom: 16 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          width: '100%', background: 'transparent', border: 0, padding: 0, cursor: 'pointer',
+          color: 'var(--gold)', marginBottom: open ? 12 : 0,
+        }}
+      >
+        <span className="section-title" style={{ margin: 0 }}>{title}</span>
+        <span style={{ fontSize: 16, color: 'var(--gold)', transition: 'transform 0.2s', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 function Setup({ t, lang, onStart, initial }) {
   const [mode, setMode] = useState(initial?.mode || 4);
   const seatLabels = (m) => m === 3 ? [t.east, t.south, t.west] : [t.east, t.south, t.west, t.north];
@@ -68,8 +88,7 @@ function Setup({ t, lang, onStart, initial }) {
         ))}
       </div>
 
-      <div className="section">
-        <div className="section-title">{t.rules}</div>
+      <CollapsibleSection title={t.rules}>
         <div className="field-row">
           <div>
             <div className="label">{t.minFan}</div>
@@ -102,10 +121,9 @@ function Setup({ t, lang, onStart, initial }) {
           </div>
           <button className={"toggle " + (pairwiseLoser ? "on" : "")} onClick={() => setPairwiseLoser(!pairwiseLoser)} />
         </div>
-      </div>
+      </CollapsibleSection>
 
-      <div className="section">
-        <div className="section-title">{t.discardShare}</div>
+      <CollapsibleSection title={t.discardShare}>
         <div className="hint" style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 10 }}>{t.discardShareHint}</div>
         {[
           { k: 'standard', label: t.shareStandard, desc: t.shareStandardDesc },
@@ -123,10 +141,9 @@ function Setup({ t, lang, onStart, initial }) {
             <p>{o.desc}</p>
           </button>
         ))}
-      </div>
+      </CollapsibleSection>
 
-      <div className="section">
-        <div className="section-title">{t.bonuses}</div>
+      <CollapsibleSection title={t.bonuses}>
         <div className="field-row">
           <div className="label">{t.flowerOwn}</div>
           <input className="num-input" type="number" value={flowerPts} onChange={e => setFlowerPts(e.target.value)} min="0" />
@@ -145,7 +162,7 @@ function Setup({ t, lang, onStart, initial }) {
           <div className="label">{t.kongClosed}</div>
           <input className="num-input" type="number" value={kongClosedPts} onChange={e => setKongClosedPts(e.target.value)} min="0" />
         </div>
-      </div>
+      </CollapsibleSection>
 
       <button className="btn btn-primary btn-block btn-lg" onClick={start}>
         {t.startSession} →
