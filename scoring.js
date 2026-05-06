@@ -91,8 +91,8 @@ window.MJ = (function () {
     const share = settings.discardShare || 'standard';
 
     if (round.outcome === 'self') {
-      // shooter_solo 3P: each loser pays 2× (total 4×); otherwise 1× each
-      const selfMult = (share === 'shooter_solo' && N === 3) ? 2 : 1;
+      // 3P self-draw: each loser pays 2× (4× total); 4P: 1× each (3× total)
+      const selfMult = N === 3 ? 2 : 1;
       for (let i = 0; i < N; i++) {
         if (i === w) continue;
         deltas[i] -= basePts * selfMult;
