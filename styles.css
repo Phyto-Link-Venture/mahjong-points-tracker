@@ -192,7 +192,7 @@ input, select { font-family: inherit; }
   color: var(--muted);
   margin-top: 2px;
 }
-input[type="text"], input[type="number"] {
+input[type="text"], input[type="number"], input[type="email"], input[type="password"] {
   background: rgba(0,0,0,0.3);
   border: 1px solid var(--felt-line);
   border-radius: var(--radius-sm);
@@ -204,7 +204,7 @@ input[type="text"], input[type="number"] {
   font-family: var(--mono);
   width: 100%;
 }
-input[type="text"] { font-family: var(--sans); }
+input[type="text"], input[type="email"], input[type="password"] { font-family: var(--sans); }
 input:focus { border-color: var(--gold); }
 .num-input {
   width: 90px;
