@@ -102,13 +102,12 @@ window.MJ = (function () {
       const d = round.discarderIdx;
       // Discard share rules:
       //  - 'standard'    : discarder 2× · others 1× each
-      //  - 'shooter_solo': discarder pays alone (4P: 3×, 3P: 1.5×), others 0
+      //  - 'shooter_solo': discarder pays 3× alone (6× on limit hand via basePts doubling), others 0
       for (let i = 0; i < N; i++) {
         if (i === w) continue;
         let pay;
         if (share === 'shooter_solo') {
-          const soloTotal = (N === 3 ? 1.5 : 3) * basePts;
-          pay = (i === d) ? soloTotal : 0;
+          pay = (i === d) ? 3 * basePts : 0;
         } else {
           pay = (i === d) ? basePts * 2 : basePts;
         }
