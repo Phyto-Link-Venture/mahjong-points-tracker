@@ -28,7 +28,6 @@ function Setup({ t, lang, onStart, initial }) {
   const [minFan, setMinFan] = useState(initial?.minFan ?? 5);
   const [maxFan, setMaxFan] = useState(initial?.maxFan ?? 10);
   const [basePoint, setBasePoint] = useState(initial?.basePoint ?? 1);
-  const [dealerDouble, setDealerDouble] = useState(initial?.dealerDouble ?? true);
   const [pairwiseLoser, setPairwiseLoser] = useState(initial?.pairwiseLoser ?? true);
   const [discardShare, setDiscardShare] = useState(initial?.discardShare ?? 'standard');
   const [flowerPts, setFlowerPts] = useState(initial?.flowerPts ?? 1);
@@ -44,7 +43,7 @@ function Setup({ t, lang, onStart, initial }) {
       mode, names: playerNames,
       minFan: Number(minFan), maxFan: Number(maxFan),
       basePoint: Number(basePoint),
-      dealerDouble, pairwiseLoser, discardShare,
+      pairwiseLoser, discardShare,
       flowerPts: Number(flowerPts), flyPts: Number(flyPts),
       kongOpenPts: Number(kongOpenPts), kongClosedPts: Number(kongClosedPts),
     });
@@ -110,12 +109,6 @@ function Setup({ t, lang, onStart, initial }) {
         </div>
         <div className="field-row">
           <div>
-            <div className="label">{t.dealerDouble}</div>
-          </div>
-          <button className={"toggle " + (dealerDouble ? "on" : "")} onClick={() => setDealerDouble(!dealerDouble)} />
-        </div>
-        <div className="field-row">
-          <div>
             <div className="label">{t.pairwiseLoser}</div>
             <div className="hint">{t.pairwiseLoserHint}</div>
           </div>
@@ -127,9 +120,7 @@ function Setup({ t, lang, onStart, initial }) {
         <div className="hint" style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 10 }}>{t.discardShareHint}</div>
         {[
           { k: 'standard', label: t.shareStandard, desc: t.shareStandardDesc },
-          { k: 'helper', label: t.shareHelper, desc: t.shareHelperDesc },
           { k: 'shooter_solo', label: t.shareShooter15, desc: t.shareShooter15Desc },
-          { k: 'shooter_full', label: t.shareShooter, desc: t.shareShooterDesc },
         ].map(o => (
           <button
             key={o.k}

@@ -57,7 +57,6 @@ function App() {
       mode: cfg.mode,
       minFan: cfg.minFan, maxFan: cfg.maxFan,
       basePoint: cfg.basePoint,
-      dealerDouble: cfg.dealerDouble,
       pairwiseLoser: cfg.pairwiseLoser,
       discardShare: cfg.discardShare || 'standard',
       flowerPts: cfg.flowerPts, flyPts: cfg.flyPts,

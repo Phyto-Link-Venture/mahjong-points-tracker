@@ -13,6 +13,7 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
   const [penaltyPoints, setPenaltyPoints] = useStateRE(initial?.penaltyPoints ?? 10);
   const [notes, setNotes] = useStateRE(initial?.notes || "");
   const [simplePays, setSimplePays] = useStateRE(initial?.simple?.winnerPays || {});
+  const [showFanHelper, setShowFanHelper] = useStateRE(false);
 
   const seatLabels = N === 3 ? [t.east, t.south, t.west] : [t.east, t.south, t.west, t.north];
 
@@ -126,7 +127,15 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
           {/* Fan / simple winner pays */}
           {(outcome === 'self' || outcome === 'discard') && !simpleMode && (
             <div style={{ marginBottom: 18 }}>
-              <div className="section-title">{t.fanCount}</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div className="section-title" style={{ margin: 0 }}>{t.fanCount}</div>
+                <button
+                  onClick={() => setShowFanHelper(true)}
+                  style={{ fontSize: 11, color: 'var(--gold)', background: 'transparent', border: '1px solid var(--gold)', borderRadius: 12, padding: '3px 10px', cursor: 'pointer' }}
+                >
+                  {t.fhTitle} ↗
+                </button>
+              </div>
               <div className="fan-stepper">
                 <div className="fan-pill">
                   <button onClick={() => setFan(Math.max(0, Number(fan) - 1))}>−</button>
@@ -273,7 +282,14 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
 
           {/* Preview */}
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--felt-line)' }}>
-            <div className="section-title">{t.delta}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span className="section-title" style={{ margin: 0 }}>{t.delta}</span>
+              {(outcome === 'self' || outcome === 'discard') && !simpleMode && Number(fan) >= settings.maxFan && (
+                <span style={{ background: 'var(--red-dim)', color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, letterSpacing: '0.06em' }}>
+                  {t.limitHandNote.split('·')[0].trim()} ×2
+                </span>
+              )}
+            </div>
             <div className="round-card-deltas">
               {players.map((p, i) => {
                 const v = previewDeltas[i];
@@ -295,6 +311,15 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
           </button>
         </div>
       </div>
+
+      {showFanHelper && (
+        <FanHelper
+          t={t}
+          settings={settings}
+          onUse={(f) => { setFan(f); setShowFanHelper(false); }}
+          onClose={() => setShowFanHelper(false)}
+        />
+      )}
     </div>
   );
 }

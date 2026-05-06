@@ -84,44 +84,31 @@ window.MJ = (function () {
 
     // Detailed (fan-based)
     let basePts = fanToPoints(round.fan, settings);
-    if (settings.dealerDouble && w === dealerIdx) basePts *= 2;
     // Limit hand (winner reached maxFan) → payout doubles
     const isLimit = Number(round.fan) >= settings.maxFan;
     if (isLimit) basePts *= 2;
 
+    const share = settings.discardShare || 'standard';
+
     if (round.outcome === 'self') {
-      // All others pay basePts (some rules pay double on self-draw; we treat basePts as final per loser)
+      // shooter_solo 3P: each loser pays 2× (total 4×); otherwise 1× each
+      const selfMult = (share === 'shooter_solo' && N === 3) ? 2 : 1;
       for (let i = 0; i < N; i++) {
         if (i === w) continue;
-        deltas[i] -= basePts;
-        deltas[w] += basePts;
+        deltas[i] -= basePts * selfMult;
+        deltas[w] += basePts * selfMult;
       }
     } else if (round.outcome === 'discard') {
       const d = round.discarderIdx;
-      // Discarder share rules (basePts = points-per-loser baseline):
-      //  - 'standard'      : discarder 2× · others 1× each
-      //                       (4P total to winner = 2+1+1 = 4×; 3P = 2+1 = 3×)
-      //  - 'helper'        : discarder 1.5× · each other loser 0.5×
-      //                       (4P total = 2.5×; 3P = 2×)
-      //  - 'shooter_solo'  : discarder pays alone, equal to standard discarder share
-      //                       (3× in 4P / 2× in 3P) · others 0
-      //  - 'shooter_full'  : discarder absorbs everything (full standard total alone)
-      //                       (4P = 4× alone; 3P = 3× alone)
-      const share = settings.discardShare || 'standard';
-      const others = N - 1;
+      // Discard share rules:
+      //  - 'standard'    : discarder 2× · others 1× each
+      //  - 'shooter_solo': discarder pays alone (4P: 3×, 3P: 1.5×), others 0
       for (let i = 0; i < N; i++) {
         if (i === w) continue;
         let pay;
-        if (share === 'shooter_full') {
-          const fullTotal = (others + 1) * basePts;
-          pay = (i === d) ? fullTotal : 0;
-        } else if (share === 'shooter_solo') {
-          // Discarder pays alone; others pay 0
-          // 4P: 3× basePts; 3P: 1.5× basePts
+        if (share === 'shooter_solo') {
           const soloTotal = (N === 3 ? 1.5 : 3) * basePts;
           pay = (i === d) ? soloTotal : 0;
-        } else if (share === 'helper') {
-          pay = (i === d) ? basePts * 1.5 : basePts * 0.5;
         } else {
           pay = (i === d) ? basePts * 2 : basePts;
         }
