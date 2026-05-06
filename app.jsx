@@ -1,7 +1,9 @@
 // Main app — orchestrates everything
-const { useState: useStateA, useEffect: useEffectA } = React;
+const { useState: useStateA, useEffect: useEffectA, useCallback: useCallbackA } = React;
 
 const STORAGE_KEY = 'mahjong-tracker-v1';
+const AUTH_KEY = 'mahjong-auth-v1';
+const API = '/api';
 
 function App() {
   const [lang, setLang] = useStateA(() => {
@@ -9,22 +11,35 @@ function App() {
   });
   const t = window.I18N[lang];
 
-  const [tweaks, setTweak] = useTweaks(/*EDITMODE-BEGIN*/{
+  const [tweaks, setTweak] = useTweaks({
     "simpleMode": false
-  }/*EDITMODE-END*/);
+  });
 
   const [settings, setSettings] = useStateA(null);
   const [players, setPlayers] = useStateA([]);
   const [rounds, setRounds] = useStateA([]);
+  const [backendSessionId, setBackendSessionId] = useStateA(null);
 
-  const [view, setView] = useStateA('setup'); // setup | game
+  const [view, setView] = useStateA('setup');
   const [showEntry, setShowEntry] = useStateA(false);
   const [editingIdx, setEditingIdx] = useStateA(null);
   const [showReview, setShowReview] = useStateA(false);
   const [showExport, setShowExport] = useStateA(false);
-  const [confirm, setConfirm] = useStateA(null); // { msg, onYes }
+  const [confirm, setConfirm] = useStateA(null);
 
-  // Load
+  // Auth state
+  const [authUser, setAuthUser] = useStateA(() => {
+    try { const s = localStorage.getItem(AUTH_KEY); return s ? JSON.parse(s).user : null; } catch { return null; }
+  });
+  const [authToken, setAuthToken] = useStateA(() => {
+    try { const s = localStorage.getItem(AUTH_KEY); return s ? JSON.parse(s).token : null; } catch { return null; }
+  });
+  const [showAuth, setShowAuth] = useStateA(false);
+  const [showStats, setShowStats] = useStateA(false);
+  const [syncing, setSyncing] = useStateA(false);
+  const [syncStatus, setSyncStatus] = useStateA(null); // null | 'synced' | 'error'
+
+  // Load session
   useEffectA(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -34,23 +49,68 @@ function App() {
           setSettings(data.settings);
           setPlayers(data.players);
           setRounds(data.rounds || []);
+          setBackendSessionId(data.backendSessionId || null);
           setView('game');
         }
       }
     } catch (e) { console.warn('load failed', e); }
   }, []);
 
-  // Save
+  // Save session
   useEffectA(() => {
     if (!settings) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, players, rounds }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, players, rounds, backendSessionId }));
     } catch (e) { console.warn('save failed', e); }
-  }, [settings, players, rounds]);
+  }, [settings, players, rounds, backendSessionId]);
 
   useEffectA(() => {
     try { localStorage.setItem(STORAGE_KEY + ':lang', lang); } catch {}
   }, [lang]);
+
+  // When rounds change after a sync, mark as unsynced
+  useEffectA(() => {
+    if (syncStatus === 'synced') setSyncStatus(null);
+  }, [rounds]);
+
+  function handleLogin(user, token) {
+    setAuthUser(user);
+    setAuthToken(token);
+    try { localStorage.setItem(AUTH_KEY, JSON.stringify({ user, token })); } catch {}
+  }
+
+  function handleLogout() {
+    setAuthUser(null);
+    setAuthToken(null);
+    try { localStorage.removeItem(AUTH_KEY); } catch {}
+  }
+
+  async function syncSession() {
+    if (!authToken || !settings) return;
+    setSyncing(true); setSyncStatus(null);
+    try {
+      const res = await fetch(`${API}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          id: backendSessionId,
+          mode: settings.mode,
+          settings,
+          players,
+          rounds,
+          startedAt: rounds[0]?.ts || Date.now(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Sync failed');
+      setBackendSessionId(data.session.id);
+      setSyncStatus('synced');
+    } catch {
+      setSyncStatus('error');
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   function startSession(cfg) {
     setSettings({
@@ -64,6 +124,8 @@ function App() {
     });
     setPlayers(cfg.names);
     setRounds([]);
+    setBackendSessionId(null);
+    setSyncStatus(null);
     setView('game');
   }
 
@@ -72,6 +134,7 @@ function App() {
       msg: t.confirmReset,
       onYes: () => {
         setSettings(null); setPlayers([]); setRounds([]);
+        setBackendSessionId(null); setSyncStatus(null);
         setView('setup');
         try { localStorage.removeItem(STORAGE_KEY); } catch {}
       },
@@ -98,10 +161,7 @@ function App() {
   function deleteRound(idx) {
     setConfirm({
       msg: t.deleteConfirm,
-      onYes: () => {
-        const next = rounds.filter((_, i) => i !== idx);
-        setRounds(next);
-      },
+      onYes: () => setRounds(rounds.filter((_, i) => i !== idx)),
     });
   }
 
@@ -116,11 +176,15 @@ function App() {
               <div className="brand-tag">{t.appTagline}</div>
             </div>
           </div>
-          <LangToggle lang={lang} setLang={setLang} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <LangToggle lang={lang} setLang={setLang} />
+            <AuthButton authUser={authUser} onClick={() => setShowAuth(true)} />
+          </div>
         </div>
         <div className="content">
           <Setup t={t} lang={lang} onStart={startSession} />
         </div>
+        {showAuth && <AuthModal t={t} authUser={authUser} onLogin={handleLogin} onLogout={handleLogout} onClose={() => setShowAuth(false)} />}
       </div>
     );
   }
@@ -140,6 +204,16 @@ function App() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <LangToggle lang={lang} setLang={setLang} />
+          {authUser && (
+            <button
+              onClick={() => setShowStats(true)}
+              title={t.statsTitle}
+              style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 16, cursor: 'pointer', padding: '4px 6px' }}
+            >
+              📊
+            </button>
+          )}
+          <AuthButton authUser={authUser} onClick={() => setShowAuth(true)} />
         </div>
       </div>
       <div className="content">
@@ -151,6 +225,33 @@ function App() {
           onNewSession={newSession}
           lang={lang}
         />
+        {/* Cloud sync row */}
+        {authUser && rounds.length > 0 && (
+          <div style={{ textAlign: 'center', paddingBottom: 16 }}>
+            <button
+              onClick={syncSession}
+              disabled={syncing}
+              style={{
+                fontSize: 12, padding: '5px 16px', borderRadius: 20, cursor: syncing ? 'default' : 'pointer',
+                background: 'transparent',
+                border: '1px solid ' + (syncStatus === 'synced' ? 'var(--gold)' : syncStatus === 'error' ? 'var(--red)' : 'var(--felt-line)'),
+                color: syncStatus === 'synced' ? 'var(--gold)' : syncStatus === 'error' ? 'var(--red)' : 'var(--muted)',
+              }}
+            >
+              {syncing ? '...' : syncStatus === 'synced' ? '☁ ' + t.syncDone : syncStatus === 'error' ? t.syncError : '☁ ' + t.syncNow}
+            </button>
+          </div>
+        )}
+        {!authUser && rounds.length > 0 && (
+          <div style={{ textAlign: 'center', paddingBottom: 16 }}>
+            <button
+              onClick={() => setShowAuth(true)}
+              style={{ fontSize: 11, color: 'var(--muted)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              {t.syncLoginPrompt}
+            </button>
+          </div>
+        )}
       </div>
       <div className="bottomnav">
         <button className="nav-icon" title={t.review} onClick={() => setShowReview(true)}>☰</button>
@@ -163,9 +264,7 @@ function App() {
 
       {showEntry && (
         <RoundEntry
-          t={t}
-          settings={settings}
-          players={players}
+          t={t} settings={settings} players={players}
           dealerIdx={editingIdx != null ? MJ.dealerForRound(editingIdx + 1, settings.mode) : dealerIdx}
           initial={editingRound}
           simpleMode={!!tweaks.simpleMode}
@@ -187,6 +286,12 @@ function App() {
           onClose={() => setShowExport(false)}
         />
       )}
+      {showAuth && (
+        <AuthModal t={t} authUser={authUser} onLogin={handleLogin} onLogout={handleLogout} onClose={() => setShowAuth(false)} />
+      )}
+      {showStats && authToken && (
+        <StatsView t={t} authToken={authToken} onClose={() => setShowStats(false)} />
+      )}
       {confirm && (
         <div className="sheet-backdrop" style={{ alignItems: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setConfirm(null); }}>
           <div className="confirm">
@@ -199,7 +304,6 @@ function App() {
           </div>
         </div>
       )}
-
       <TweaksPanel title="Tweaks">
         <TweakSection title="Mode">
           <TweakRadio
@@ -220,6 +324,25 @@ function LangToggle({ lang, setLang }) {
       <button className={lang === 'en' ? 'active' : ''} onClick={() => setLang('en')}>EN</button>
       <button className={lang === 'zh' ? 'active' : ''} onClick={() => setLang('zh')}>中</button>
     </div>
+  );
+}
+
+function AuthButton({ authUser, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title={authUser ? authUser.name : 'Sign in'}
+      style={{
+        width: 30, height: 30, borderRadius: '50%',
+        background: authUser ? 'var(--gold)' : 'var(--felt-2)',
+        border: '1px solid ' + (authUser ? 'var(--gold)' : 'var(--felt-line)'),
+        color: authUser ? 'var(--felt-1)' : 'var(--muted)',
+        fontSize: 13, fontWeight: 700, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      {authUser ? authUser.name.charAt(0).toUpperCase() : '👤'}
+    </button>
   );
 }
 

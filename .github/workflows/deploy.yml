@@ -18,4 +18,14 @@ jobs:
           script: |
             cd /var/www/mahjong-points-tracker
             git pull origin main
+            docker build -t mahjong-backend ./backend
+            docker stop mahjong-backend 2>/dev/null || true
+            docker rm mahjong-backend 2>/dev/null || true
+            docker run -d \
+              --name mahjong-backend \
+              --network tb-network \
+              -p 3002:3002 \
+              --env-file /etc/mahjong.env \
+              --restart unless-stopped \
+              mahjong-backend
             chown -R www-data:www-data /var/www/mahjong-points-tracker/

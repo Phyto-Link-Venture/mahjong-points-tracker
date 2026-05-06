@@ -1,0 +1,15 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+
+const app = express();
+app.use(cors({ origin: true }));
+app.use(express.json({ limit: '4mb' }));
+
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/sessions', require('./routes/sessions'));
+app.use('/api/stats', require('./routes/stats'));
+app.get('/api/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
+
+const PORT = process.env.PORT || 3002;
+app.listen(PORT, () => console.log(`Mahjong backend :${PORT}`));
