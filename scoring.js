@@ -191,21 +191,50 @@ window.MJ = (function () {
   }
 
   // Dealer rotates each round, starting with index 0 = East
-  // In Malaysian, dealership changes every hand regardless.
   function dealerForRound(roundNumber, mode) {
     return ((roundNumber - 1) % mode + mode) % mode;
+  }
+
+  // Dealer for a given round index (0-based), respecting dealer-hold rule.
+  // roundIdx === rounds.length means "next round" (current dealer before recording).
+  function computeDealerIdx(rounds, settings, roundIdx) {
+    if (!settings.dealerHold) return dealerForRound(roundIdx + 1, settings.mode);
+    let dealer = 0;
+    for (let i = 0; i < roundIdx && i < rounds.length; i++) {
+      const r = rounds[i];
+      const won = (r.outcome === 'self' || r.outcome === 'discard') && r.winnerIdx === dealer;
+      if (!won) dealer = (dealer + 1) % settings.mode;
+    }
+    return dealer;
   }
 
   function computeTotals(rounds, settings) {
     const N = settings.mode;
     const totals = new Array(N).fill(0);
     rounds.forEach((r, idx) => {
-      const dealerIdx = dealerForRound(idx + 1, N);
-      const d = computeDeltas(r, settings, dealerIdx);
+      const d = computeDeltas(r, settings, computeDealerIdx(rounds, settings, idx));
       for (let i = 0; i < N; i++) totals[i] += d[i];
     });
     return totals;
   }
 
-  return { computeDeltas, computeTotals, dealerForRound, fanToPoints, effectiveFan };
+  // Minimum transactions to settle points into cash
+  function calcSettlement(totals, pointValue) {
+    const pos = totals.map((pts, i) => ({ i, amt: Math.round(pts * pointValue * 100) / 100 }));
+    const debtors = pos.filter(p => p.amt < 0).sort((a, b) => a.amt - b.amt).map(p => ({ ...p }));
+    const creditors = pos.filter(p => p.amt > 0).sort((a, b) => b.amt - a.amt).map(p => ({ ...p }));
+    const txns = [];
+    let di = 0, ci = 0;
+    while (di < debtors.length && ci < creditors.length) {
+      const pay = Math.min(-debtors[di].amt, creditors[ci].amt);
+      if (pay >= 0.005) txns.push({ from: debtors[di].i, to: creditors[ci].i, amount: Math.round(pay * 100) / 100 });
+      debtors[di].amt += pay;
+      creditors[ci].amt -= pay;
+      if (Math.abs(debtors[di].amt) < 0.005) di++;
+      if (Math.abs(creditors[ci].amt) < 0.005) ci++;
+    }
+    return txns;
+  }
+
+  return { computeDeltas, computeTotals, dealerForRound, computeDealerIdx, calcSettlement, fanToPoints, effectiveFan };
 })();

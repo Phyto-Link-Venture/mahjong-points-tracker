@@ -172,7 +172,7 @@ function StatsTab({ t, authToken }) {
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             {s.selfDrawWins > 0 && (
               <span style={{ fontSize: 10, background: 'rgba(212,175,55,0.15)', color: 'var(--gold)', padding: '2px 8px', borderRadius: 10 }}>
                 {t.selfDraw.split(' ')[0]} ×{s.selfDrawWins}
@@ -181,6 +181,18 @@ function StatsTab({ t, authToken }) {
             {s.discardWins > 0 && (
               <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.05)', color: 'var(--muted)', padding: '2px 8px', borderRadius: 10 }}>
                 {t.discard.split(' ')[0]} ×{s.discardWins}
+              </span>
+            )}
+            {s.recentForm && s.recentForm.length > 0 && (
+              <span style={{ display: 'flex', gap: 3, marginLeft: 2 }}>
+                {s.recentForm.map((result, ri) => (
+                  <span key={ri} style={{
+                    width: 16, height: 16, borderRadius: '50%', fontSize: 9, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: result === 'W' ? 'var(--green-pos)' : result === 'L' ? 'var(--red)' : 'var(--felt-3)',
+                    color: result === 'W' ? '#0a1f14' : result === 'L' ? '#1f0a0a' : 'var(--muted)',
+                  }}>{result}</span>
+                ))}
               </span>
             )}
             <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto' }}>
@@ -296,7 +308,7 @@ function HistoryTab({ t, authToken }) {
                   </thead>
                   <tbody>
                     {rounds.map((r, idx) => {
-                      const dIdx = MJ.dealerForRound(idx + 1, N);
+                      const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
                       const d = MJ.computeDeltas(r, settings, dIdx);
                       return (
                         <tr key={idx}>

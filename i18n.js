@@ -195,6 +195,36 @@ window.I18N = {
     fanCounterBtn: "Count fans",
     fanCounterGotIt: "Done",
     fanCounterToast: "Fan count:",
+    // Dealer hold
+    dealerHold: "Dealer holds on win",
+    dealerHoldHint: "Dealer stays if they win the round. Rotates otherwise.",
+    dealerHolds: "Holds",
+    // Settlement
+    settlementTitle: "Cash settlement",
+    settlementPointValue: "1 pt =",
+    settlementCurrency: "RM",
+    settlementPays: "pays",
+    settlementAllSquare: "All square — no payments needed!",
+    settlementBtn: "Settle",
+    // Session notes
+    sessionNotesLabel: "Session notes",
+    sessionNotesPh: "E.g. CNY game at uncle's",
+    sessionNotesBtn: "Notes",
+    // Share / watch
+    shareTitle: "Share game",
+    shareHint: "Anyone with this link can view the live score.",
+    shareLink: "Link",
+    shareCopied: "Link copied!",
+    shareEnable: "Share",
+    shareDisable: "Stop sharing",
+    shareNeedSync: "Sync first to enable sharing",
+    watchLive: "Live",
+    watchLastUpdate: "Updated",
+    watchRefresh: "Refresh",
+    watchReadOnly: "Read-only spectator view",
+    // Point value
+    pointValue: "Point value (RM)",
+    pointValueHint: "Used for cash settlement",
   },
   zh: {
     appName: "麻雀计分",
@@ -385,5 +415,35 @@ window.I18N = {
     fanCounterBtn: "算番",
     fanCounterGotIt: "好的",
     fanCounterToast: "番数：",
+    // Dealer hold
+    dealerHold: "赢家续庄",
+    dealerHoldHint: "赢家是庄家时继续做庄，否则换庄。",
+    dealerHolds: "续庄",
+    // Settlement
+    settlementTitle: "结算",
+    settlementPointValue: "1分 =",
+    settlementCurrency: "RM",
+    settlementPays: "付给",
+    settlementAllSquare: "全部平手，无需付款！",
+    settlementBtn: "结算",
+    // Session notes
+    sessionNotesLabel: "对局备注",
+    sessionNotesPh: "例：春节在舅舅家打",
+    sessionNotesBtn: "备注",
+    // Share / watch
+    shareTitle: "分享对局",
+    shareHint: "拥有链接的人可以查看实时分数。",
+    shareLink: "链接",
+    shareCopied: "链接已复制！",
+    shareEnable: "开启分享",
+    shareDisable: "关闭分享",
+    shareNeedSync: "请先同步才能分享",
+    watchLive: "实时",
+    watchLastUpdate: "更新于",
+    watchRefresh: "刷新",
+    watchReadOnly: "只读旁观模式",
+    // Point value
+    pointValue: "分值（马币）",
+    pointValueHint: "用于现金结算",
   }
 };

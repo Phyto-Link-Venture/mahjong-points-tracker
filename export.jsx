@@ -17,7 +17,7 @@ function ExportSheet({ t, settings, players, rounds, onClose }) {
     lines.push("");
     lines.push(t.reviewTitle + ":");
     rounds.forEach((r, idx) => {
-      const dIdx = MJ.dealerForRound(idx + 1, N);
+      const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
       const d = MJ.computeDeltas(r, settings, dIdx);
       const sum = window.summarizeRound(r, players, t);
       lines.push(`#${idx + 1} ${sum}`);
@@ -175,7 +175,7 @@ function ExportSheet({ t, settings, players, rounds, onClose }) {
     // Round rows
     const rowsY = HEADER_H + COL_HDR_H;
     rounds.forEach((r, idx) => {
-      const dIdx = MJ.dealerForRound(idx + 1, N);
+      const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
       const d = MJ.computeDeltas(r, settings, dIdx);
       const ry = rowsY + idx * ROW_H;
 
@@ -310,7 +310,7 @@ function ExportSheet({ t, settings, players, rounds, onClose }) {
               </thead>
               <tbody>
                 {rounds.map((r, idx) => {
-                  const dIdx = MJ.dealerForRound(idx + 1, N);
+                  const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
                   const d = MJ.computeDeltas(r, settings, dIdx);
                   return (
                     <tr key={r.id}>

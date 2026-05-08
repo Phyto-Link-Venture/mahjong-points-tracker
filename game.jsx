@@ -5,18 +5,25 @@ function Game({ t, settings, players, rounds, onAddRound, onShowReview, onShowEx
   const N = settings.mode;
   const totals = MJ.computeTotals(rounds, settings);
   const seatLabels = N === 3 ? [t.east, t.south, t.west] : [t.east, t.south, t.west, t.north];
-  const nextRoundIdx = rounds.length + 1;
-  const dealerIdx = MJ.dealerForRound(nextRoundIdx, N);
+  const dealerIdx = MJ.computeDealerIdx(rounds, settings, rounds.length);
+  // Check if dealer won last round (hold in progress)
+  const lastRound = rounds[rounds.length - 1];
+  const dealerHolding = settings.dealerHold && lastRound &&
+    (lastRound.outcome === 'self' || lastRound.outcome === 'discard') &&
+    lastRound.winnerIdx === MJ.computeDealerIdx(rounds, settings, rounds.length - 1);
 
   return (
     <div>
       <div className="round-counter">
         <div>
           <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t.round}</div>
-          <div className="num">#{nextRoundIdx}</div>
+          <div className="num">#{rounds.length + 1}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{t.dealer}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+            {dealerHolding && <span style={{ background: 'var(--gold)', color: 'var(--felt-1)', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 999, letterSpacing: '0.06em' }}>{t.dealerHolds}</span>}
+            {t.dealer}
+          </div>
           <div style={{ color: 'var(--gold)', fontFamily: 'var(--serif)', fontSize: 18 }}>
             {players[dealerIdx]} <span style={{ fontSize: 12, opacity: 0.7 }}>({seatLabels[dealerIdx]})</span>
           </div>
@@ -38,6 +45,13 @@ function Game({ t, settings, players, rounds, onAddRound, onShowReview, onShowEx
         })}
       </div>
 
+      {/* Session notes display */}
+      {settings.sessionNotes && (
+        <div style={{ fontSize: 12, color: 'var(--muted)', fontStyle: 'italic', marginBottom: 12, padding: '8px 12px', background: 'rgba(0,0,0,0.15)', borderRadius: 8, borderLeft: '2px solid var(--felt-line)' }}>
+          {settings.sessionNotes}
+        </div>
+      )}
+
       {rounds.length === 0 ? (
         <div className="empty-state">
           <div className="icon">麻</div>
@@ -49,7 +63,7 @@ function Game({ t, settings, players, rounds, onAddRound, onShowReview, onShowEx
           <div className="section-title">{t.review}</div>
           {rounds.slice(-3).reverse().map((r, idx) => {
             const realIdx = rounds.length - 1 - idx;
-            const dIdx = MJ.dealerForRound(realIdx + 1, N);
+            const dIdx = MJ.computeDealerIdx(rounds, settings, realIdx);
             const deltas = MJ.computeDeltas(r, settings, dIdx);
             return (
               <div key={r.id} className="round-card">

@@ -34,6 +34,8 @@ function Setup({ t, lang, onStart, initial }) {
   const [flyPts, setFlyPts] = useState(initial?.flyPts ?? 1);
   const [kongOpenPts, setKongOpenPts] = useState(initial?.kongOpenPts ?? 1);
   const [kongClosedPts, setKongClosedPts] = useState(initial?.kongClosedPts ?? 2);
+  const [dealerHold, setDealerHold] = useState(initial?.dealerHold ?? false);
+  const [pointValue, setPointValue] = useState(initial?.pointValue ?? 0.10);
 
   const seats = seatLabels(mode);
 
@@ -43,9 +45,10 @@ function Setup({ t, lang, onStart, initial }) {
       mode, names: playerNames,
       minFan: Number(minFan), maxFan: Number(maxFan),
       basePoint: Number(basePoint),
-      pairwiseLoser, discardShare,
+      pairwiseLoser, discardShare, dealerHold,
       flowerPts: Number(flowerPts), flyPts: Number(flyPts),
       kongOpenPts: Number(kongOpenPts), kongClosedPts: Number(kongClosedPts),
+      pointValue: Number(pointValue) || 0.10,
     });
   }
 
@@ -113,6 +116,20 @@ function Setup({ t, lang, onStart, initial }) {
             <div className="hint">{t.pairwiseLoserHint}</div>
           </div>
           <button className={"toggle " + (pairwiseLoser ? "on" : "")} onClick={() => setPairwiseLoser(!pairwiseLoser)} />
+        </div>
+        <div className="field-row">
+          <div>
+            <div className="label">{t.dealerHold}</div>
+            <div className="hint">{t.dealerHoldHint}</div>
+          </div>
+          <button className={"toggle " + (dealerHold ? "on" : "")} onClick={() => setDealerHold(!dealerHold)} />
+        </div>
+        <div className="field-row">
+          <div>
+            <div className="label">{t.pointValue}</div>
+            <div className="hint">{t.pointValueHint}</div>
+          </div>
+          <input className="num-input" type="number" value={pointValue} onChange={e => setPointValue(e.target.value)} min="0" step="0.01" />
         </div>
       </CollapsibleSection>
 

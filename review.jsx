@@ -11,7 +11,7 @@ function Review({ t, settings, players, rounds, onEdit, onDelete, onClose }) {
   const running = [];
   const acc = new Array(N).fill(0);
   rounds.forEach((r, idx) => {
-    const dIdx = MJ.dealerForRound(idx + 1, N);
+    const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
     const d = MJ.computeDeltas(r, settings, dIdx);
     for (let i = 0; i < N; i++) acc[i] += d[i];
     running.push({ deltas: d, totals: [...acc] });
