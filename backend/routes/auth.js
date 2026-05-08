@@ -5,8 +5,6 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { PrismaClient } = require('@prisma/client');
 const { body, validationResult } = require('express-validator');
-let nodemailer;
-try { nodemailer = require('nodemailer'); } catch { nodemailer = null; }
 
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -28,34 +26,31 @@ function makeVerifyToken() {
 }
 
 async function sendVerifyEmail(email, name, token) {
-  if (!process.env.SMTP_HOST || !nodemailer) return; // silently skip if not configured
+  const appUrl = process.env.APP_URL || 'https://mahjong.phytolink-venture.com';
+  const link = `${appUrl}/api/auth/verify-email?token=${token}`;
+  // Log link so admin can manually share it if no email service is configured
+  console.log(`[verify] ${email} → ${link}`);
+
+  // Send via SMTP webhook (Resend / SendGrid / SMTP2GO etc.) if configured
+  const webhookUrl = process.env.EMAIL_WEBHOOK_URL;
+  if (!webhookUrl) return;
   try {
-    const transport = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_PORT === '465',
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-    const appUrl = process.env.APP_URL || 'https://mahjong.phytolink.io';
-    const link = `${appUrl}/api/auth/verify-email?token=${token}`;
-    await transport.sendMail({
-      from: process.env.SMTP_FROM || `Mahjong Points <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: 'Verify your Mahjong Points account',
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
-          <h2 style="color:#1e3028;margin-bottom:8px">麻将计分 · Mahjong Points</h2>
-          <p>Hi ${name},</p>
-          <p>Click the button below to verify your email address.</p>
-          <a href="${link}" style="display:inline-block;background:#c8a84b;color:#1e3028;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;margin:16px 0">
-            Verify Email
-          </a>
-          <p style="color:#888;font-size:12px">If you didn't create an account, you can ignore this email.</p>
-        </div>
-      `,
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: email,
+        subject: 'Verify your Mahjong Points account',
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+          <h2 style="color:#1e3028">麻将计分 · Mahjong Points</h2>
+          <p>Hi ${name}, click below to verify your email.</p>
+          <a href="${link}" style="display:inline-block;background:#c8a84b;color:#1e3028;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;margin:16px 0">Verify Email</a>
+          <p style="color:#888;font-size:12px">If you didn't create an account, ignore this email.</p>
+        </div>`,
+      }),
     });
   } catch (e) {
-    console.error('Email send failed:', e.message);
+    console.error('Email webhook failed:', e.message);
   }
 }
 
