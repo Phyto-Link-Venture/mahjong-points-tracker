@@ -8,6 +8,9 @@ const API = '/api';
 // Check if opened as a spectator watch link
 const watchMatch = window.location.hash.match(/^#watch\/(.+)$/);
 const WATCH_ID = watchMatch ? watchMatch[1] : null;
+// Check if returning from email verification link
+const verifyMatch = window.location.hash.match(/^#verified=(.+)$/);
+const VERIFY_RESULT = verifyMatch ? verifyMatch[1] : null;
 
 function App() {
   const [lang, setLang] = useStateA(() => {
@@ -53,6 +56,8 @@ function App() {
   const [watchingSessionId, setWatchingSessionId] = useStateA(null);
   const [showJoin, setShowJoin] = useStateA(false);
   const [showSummary, setShowSummary] = useStateA(false);
+  const [showFeedback, setShowFeedback] = useStateA(false);
+  const [verifyToast, setVerifyToast] = useStateA(() => VERIFY_RESULT === '1' ? 'success' : VERIFY_RESULT === 'fail' ? 'fail' : null);
   const [undoBuffer, setUndoBuffer] = useStateA(null); // { round, timer }
   const autoSyncTimer = React.useRef(null);
 
@@ -96,6 +101,17 @@ function App() {
     autoSyncTimer.current = setTimeout(() => { syncSession(); }, 2000);
     return () => clearTimeout(autoSyncTimer.current);
   }, [rounds]);
+
+  // Clear verify hash from URL and auto-dismiss toast
+  useEffectA(() => {
+    if (!verifyToast) return;
+    if (verifyToast === 'success' && authUser) {
+      setAuthUser(prev => prev ? { ...prev, emailVerified: true } : prev);
+    }
+    if (VERIFY_RESULT) history.replaceState(null, '', window.location.pathname + window.location.search);
+    const t = setTimeout(() => setVerifyToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [verifyToast]);
 
   function dismissOnboarding() {
     setShowOnboarding(false);
@@ -282,6 +298,10 @@ function App() {
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <LangToggle lang={lang} setLang={setLang} />
+            <button onClick={() => setShowFeedback(true)} title={t.feedbackBtn}
+              style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer', padding: '4px 6px' }}>
+              💬
+            </button>
             <AuthButton authUser={authUser} onClick={() => setShowAuth(true)} />
           </div>
         </div>
@@ -296,9 +316,16 @@ function App() {
         </div>
         {showAuth && <AuthModal t={t} authUser={authUser} onLogin={handleLogin} onLogout={handleLogout} onClose={() => setShowAuth(false)} />}
         {showJoin && <JoinSheet t={t} onJoin={id => { setWatchingSessionId(id); setShowJoin(false); }} onClose={() => setShowJoin(false)} />}
+        {showFeedback && <FeedbackSheet t={t} authToken={authToken} onClose={() => setShowFeedback(false)} />}
         {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
         <IOSInstallBanner t={t} />
         {showAndroidBanner && <AndroidInstallBanner t={t} prompt={androidPrompt} onDismiss={dismissAndroidBanner} />}
+        {authUser && authUser.emailVerified === false && (
+          <EmailVerifyBanner t={t} authToken={authToken} />
+        )}
+        {verifyToast === 'success' && (
+          <div className="toast" style={{ background: 'var(--gold)', color: 'var(--felt-1)' }}>{t.emailVerifySuccess}</div>
+        )}
       </div>
     );
   }
@@ -324,6 +351,10 @@ function App() {
               📊
             </button>
           )}
+          <button onClick={() => setShowFeedback(true)} title={t.feedbackBtn}
+            style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer', padding: '4px 6px' }}>
+            💬
+          </button>
           <AuthButton authUser={authUser} onClick={() => setShowAuth(true)} />
         </div>
       </div>
@@ -446,6 +477,7 @@ function App() {
       {showStats && authToken && (
         <StatsView t={t} authToken={authToken} onClose={() => setShowStats(false)} />
       )}
+      {showFeedback && <FeedbackSheet t={t} authToken={authToken} onClose={() => setShowFeedback(false)} />}
       {confirm && (
         <div className="sheet-backdrop" style={{ alignItems: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setConfirm(null); }}>
           <div className="confirm">
@@ -482,6 +514,12 @@ function App() {
       {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
       <IOSInstallBanner t={t} />
       {showAndroidBanner && <AndroidInstallBanner t={t} prompt={androidPrompt} onDismiss={dismissAndroidBanner} />}
+      {authUser && authUser.emailVerified === false && (
+        <EmailVerifyBanner t={t} authToken={authToken} />
+      )}
+      {verifyToast === 'success' && (
+        <div className="toast" style={{ background: 'var(--gold)', color: 'var(--felt-1)' }}>{t.emailVerifySuccess}</div>
+      )}
     </div>
   );
 }
@@ -986,6 +1024,141 @@ function OnboardingModal({ t, onDone }) {
         </div>
         <button className="btn btn-primary btn-block btn-lg" onClick={onDone}>{t.onboardGotIt}</button>
       </div>
+    </div>
+  );
+}
+
+// ── Feedback sheet ───────────────────────────────────────────────────────────
+function FeedbackSheet({ t, authToken, onClose }) {
+  const [title, setTitle] = React.useState('');
+  const [message, setMessage] = React.useState('');
+  const [status, setStatus] = React.useState(null); // null | 'sending' | 'ok' | 'error'
+
+  async function submit() {
+    if (!title.trim() || !message.trim()) return;
+    setStatus('sending');
+    try {
+      const res = await fetch(`${API}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ title: title.trim(), message: message.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      setStatus('ok');
+      setTimeout(onClose, 2000);
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" style={{ zIndex: 300 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="sheet-header">
+          <h2>{t.feedbackTitle}</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        {status === 'ok' ? (
+          <div className="sheet-body" style={{ textAlign: 'center', padding: '32px 20px' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🎉</div>
+            <div style={{ color: 'var(--gold)', fontWeight: 600 }}>{t.feedbackSuccess}</div>
+          </div>
+        ) : (
+          <>
+            <div className="sheet-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {!authToken && (
+                <div style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: 8, borderLeft: '2px solid var(--felt-line)' }}>
+                  {t.syncLoginPrompt}
+                </div>
+              )}
+              <div>
+                <div className="section-title">{t.feedbackTitleLabel}</div>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder={t.feedbackTitlePh}
+                  style={{ width: '100%' }}
+                  maxLength={120}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <div className="section-title">{t.feedbackMessage}</div>
+                <textarea
+                  value={message}
+                  onChange={e => setMessage(e.target.value)}
+                  placeholder={t.feedbackMessagePh}
+                  rows={5}
+                  maxLength={2000}
+                  style={{ width: '100%', resize: 'vertical', minHeight: 100, background: 'var(--felt-3)', border: '1px solid var(--felt-line)', borderRadius: 10, color: 'var(--cream)', padding: '10px 12px', fontFamily: 'inherit', fontSize: 14, boxSizing: 'border-box' }}
+                />
+              </div>
+              {status === 'error' && (
+                <div style={{ color: 'var(--red)', fontSize: 13 }}>{t.feedbackError}</div>
+              )}
+            </div>
+            <div className="sheet-footer">
+              <button
+                className="btn btn-primary btn-block"
+                onClick={submit}
+                disabled={!authToken || !title.trim() || !message.trim() || status === 'sending'}
+                style={{ opacity: (!authToken || !title.trim() || !message.trim()) ? 0.5 : 1 }}
+              >
+                {status === 'sending' ? t.feedbackSubmitting : t.feedbackSubmit}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Email verify banner ──────────────────────────────────────────────────────
+function EmailVerifyBanner({ t, authToken }) {
+  const [dismissed, setDismissed] = React.useState(false);
+  const [resent, setResent] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+
+  if (dismissed) return null;
+
+  async function resend() {
+    if (!authToken || sending) return;
+    setSending(true);
+    try {
+      await fetch(`${API}/auth/resend-verify`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      setResent(true);
+      setTimeout(() => setResent(false), 4000);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 8000,
+      background: 'rgba(180,120,20,0.95)',
+      padding: 'calc(8px + env(safe-area-inset-top)) 16px 10px',
+      display: 'flex', alignItems: 'center', gap: 10,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, color: '#fff', fontSize: 13 }}>{t.emailVerifyBanner}</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>{t.emailVerifyBannerHint}</div>
+      </div>
+      <button
+        onClick={resend}
+        disabled={sending}
+        style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', color: '#fff', borderRadius: 14, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+        {resent ? t.emailVerifyResent : sending ? '...' : t.emailVerifyResend}
+      </button>
+      <button onClick={() => setDismissed(true)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 20, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
     </div>
   );
 }

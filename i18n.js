@@ -261,6 +261,23 @@ window.I18N = {
     onboardStep3: "When you're done, tap 💰 Settle to see who pays who",
     onboardStep4: "Tap 👤 to sign in and save session history across devices",
     onboardGotIt: "Got it — let's play!",
+    // Feedback
+    feedbackBtn: "Feedback",
+    feedbackTitle: "Feedback & suggestions",
+    feedbackTitleLabel: "Title",
+    feedbackTitlePh: "Brief description of your idea or issue",
+    feedbackMessage: "Message",
+    feedbackMessagePh: "Tell us more...",
+    feedbackSubmit: "Submit",
+    feedbackSubmitting: "Sending...",
+    feedbackSuccess: "Thanks! Your feedback has been submitted.",
+    feedbackError: "Failed to send — please try again.",
+    // Email verification
+    emailVerifyBanner: "Please verify your email",
+    emailVerifyBannerHint: "Check your inbox for a verification link.",
+    emailVerifyResend: "Resend",
+    emailVerifyResent: "Sent!",
+    emailVerifySuccess: "Email verified!",
   },
   zh: {
     appName: "麻将计分",
@@ -517,5 +534,22 @@ window.I18N = {
     onboardStep3: "结束时点击 💰「结算」查看谁付给谁",
     onboardStep4: "点击 👤 登录，跨设备保存对局记录",
     onboardGotIt: "明白了，开始打牌！",
+    // Feedback
+    feedbackBtn: "反馈",
+    feedbackTitle: "反馈与建议",
+    feedbackTitleLabel: "标题",
+    feedbackTitlePh: "简要描述你的想法或问题",
+    feedbackMessage: "内容",
+    feedbackMessagePh: "详细描述...",
+    feedbackSubmit: "提交",
+    feedbackSubmitting: "发送中...",
+    feedbackSuccess: "感谢！您的反馈已提交。",
+    feedbackError: "发送失败，请重试。",
+    // Email verification
+    emailVerifyBanner: "请验证您的邮箱",
+    emailVerifyBannerHint: "请查收验证邮件并点击链接完成验证。",
+    emailVerifyResend: "重新发送",
+    emailVerifyResent: "已发送！",
+    emailVerifySuccess: "邮箱已验证！",
   }
 };

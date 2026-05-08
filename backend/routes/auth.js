@@ -1,9 +1,11 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { PrismaClient } = require('@prisma/client');
 const { body, validationResult } = require('express-validator');
+const nodemailer = require('nodemailer');
 
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -17,7 +19,43 @@ function makeToken(user) {
 }
 
 function safeUser(u) {
-  return { id: u.id, email: u.email, name: u.name, createdAt: u.createdAt };
+  return { id: u.id, email: u.email, name: u.name, createdAt: u.createdAt, emailVerified: u.emailVerified };
+}
+
+function makeVerifyToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+async function sendVerifyEmail(email, name, token) {
+  if (!process.env.SMTP_HOST) return; // silently skip if not configured
+  try {
+    const transport = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_PORT === '465',
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+    const appUrl = process.env.APP_URL || 'https://mahjong.phytolink.io';
+    const link = `${appUrl}/api/auth/verify-email?token=${token}`;
+    await transport.sendMail({
+      from: process.env.SMTP_FROM || `Mahjong Points <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Verify your Mahjong Points account',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+          <h2 style="color:#1e3028;margin-bottom:8px">麻将计分 · Mahjong Points</h2>
+          <p>Hi ${name},</p>
+          <p>Click the button below to verify your email address.</p>
+          <a href="${link}" style="display:inline-block;background:#c8a84b;color:#1e3028;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;margin:16px 0">
+            Verify Email
+          </a>
+          <p style="color:#888;font-size:12px">If you didn't create an account, you can ignore this email.</p>
+        </div>
+      `,
+    });
+  } catch (e) {
+    console.error('Email send failed:', e.message);
+  }
 }
 
 // Register
@@ -35,7 +73,11 @@ router.post('/register', [
       return res.status(400).json({ error: 'Email already registered' });
     }
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({ data: { email, name, passwordHash } });
+    const emailVerifyToken = makeVerifyToken();
+    const user = await prisma.user.create({
+      data: { email, name, passwordHash, emailVerified: false, emailVerifyToken },
+    });
+    await sendVerifyEmail(email, name, emailVerifyToken);
     res.json({ token: makeToken(user), user: safeUser(user) });
   } catch (e) {
     console.error(e);
@@ -73,19 +115,64 @@ router.post('/google', async (req, res) => {
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
-    const { sub: googleId, email, name } = ticket.getPayload();
+    const { sub: googleId, email, name, email_verified } = ticket.getPayload();
 
     let user = await prisma.user.findUnique({ where: { googleId } });
-    if (!user) {
+    if (user && !user.emailVerified && email_verified) {
+      user = await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+    } else if (!user) {
       const byEmail = await prisma.user.findUnique({ where: { email } });
-      user = byEmail
-        ? await prisma.user.update({ where: { id: byEmail.id }, data: { googleId } })
-        : await prisma.user.create({ data: { email, name, googleId } });
+      if (byEmail) {
+        user = await prisma.user.update({
+          where: { id: byEmail.id },
+          data: { googleId, emailVerified: byEmail.emailVerified || !!email_verified },
+        });
+      } else {
+        user = await prisma.user.create({
+          data: { email, name, googleId, emailVerified: !!email_verified },
+        });
+      }
     }
     res.json({ token: makeToken(user), user: safeUser(user) });
   } catch (e) {
     console.error(e);
     res.status(400).json({ error: 'Invalid Google credential' });
+  }
+});
+
+// Verify email via link
+router.get('/verify-email', async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).send('Missing token');
+  try {
+    const user = await prisma.user.findUnique({ where: { emailVerifyToken: token } });
+    if (!user) return res.redirect((process.env.APP_URL || '') + '/#verified=fail');
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerifyToken: null },
+    });
+    res.redirect((process.env.APP_URL || '') + '/#verified=1');
+  } catch (e) {
+    console.error(e);
+    res.status(500).send('Server error');
+  }
+});
+
+// Resend verification email
+router.post('/resend-verify', require('../middleware/requireAuth'), async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.emailVerified) return res.json({ ok: true, already: true });
+    if (!user.passwordHash) return res.json({ ok: true, googleOnly: true }); // Google users auto-verified
+
+    const emailVerifyToken = makeVerifyToken();
+    await prisma.user.update({ where: { id: user.id }, data: { emailVerifyToken } });
+    await sendVerifyEmail(user.email, user.name, emailVerifyToken);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

@@ -11,6 +11,7 @@ app.use('/api/sessions', require('./routes/sessions'));
 app.use('/api/stats', require('./routes/stats'));
 app.use('/api/players', require('./routes/players'));
 app.use('/api/watch', require('./routes/watch'));
+app.use('/api/feedback', require('./routes/feedback'));
 app.get('/api/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
 
 const PORT = process.env.PORT || 3002;
