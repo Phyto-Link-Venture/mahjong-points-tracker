@@ -229,6 +229,11 @@ window.I18N = {
     iosInstallTitle: "Install on your iPhone",
     iosInstallHint: "Tap the Share button then \"Add to Home Screen\" to install for offline use.",
     iosInstallDismiss: "Maybe later",
+    // Android install banner
+    androidInstallTitle: "Install as app",
+    androidInstallHint: "Get the full-screen experience with offline support.",
+    androidInstallBtn: "Install",
+    androidInstallManual: "Or: Chrome menu (⋮) → Add to Home Screen",
     // Onboarding
     onboardTitle: "Welcome to Mahjong Points",
     onboardStep1: "Set up your players, then tap Start Session",
@@ -460,6 +465,11 @@ window.I18N = {
     iosInstallTitle: "安装到主屏幕",
     iosInstallHint: "点击底部的分享按钮，然后选择「添加到主屏幕」即可离线使用。",
     iosInstallDismiss: "稍后再说",
+    // Android install banner
+    androidInstallTitle: "安装为应用",
+    androidInstallHint: "支持全屏与离线使用。",
+    androidInstallBtn: "安装",
+    androidInstallManual: "或：Chrome 菜单 (⋮) → 添加到主屏幕",
     // Onboarding
     onboardTitle: "欢迎使用麻雀计分",
     onboardStep1: "设置玩家后，点击「开始对局」",

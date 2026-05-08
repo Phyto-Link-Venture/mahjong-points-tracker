@@ -48,6 +48,8 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useStateA(() => {
     try { return !localStorage.getItem('mahjong-onboarded'); } catch { return false; }
   });
+  const [androidPrompt, setAndroidPrompt] = useStateA(null);
+  const [showAndroidBanner, setShowAndroidBanner] = useStateA(false);
 
   // Load session
   useEffectA(() => {
@@ -85,6 +87,26 @@ function App() {
   function dismissOnboarding() {
     setShowOnboarding(false);
     try { localStorage.setItem('mahjong-onboarded', '1'); } catch {}
+  }
+
+  useEffectA(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) return;
+    try { if (localStorage.getItem('pwa-android-dismissed')) return; } catch {}
+
+    function onBeforeInstallPrompt(e) {
+      e.preventDefault();
+      setAndroidPrompt(e);
+      setShowAndroidBanner(true);
+    }
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+  }, []);
+
+  function dismissAndroidBanner() {
+    setShowAndroidBanner(false);
+    setAndroidPrompt(null);
+    try { localStorage.setItem('pwa-android-dismissed', '1'); } catch {}
   }
 
   function handleLogin(user, token) {
@@ -228,6 +250,7 @@ function App() {
         {showAuth && <AuthModal t={t} authUser={authUser} onLogin={handleLogin} onLogout={handleLogout} onClose={() => setShowAuth(false)} />}
         {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
         <IOSInstallBanner t={t} />
+        {showAndroidBanner && <AndroidInstallBanner t={t} prompt={androidPrompt} onDismiss={dismissAndroidBanner} />}
       </div>
     );
   }
@@ -599,6 +622,50 @@ function WatchView({ t, sessionId, lang, setLang }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Android install banner ──────────────────────────────────────────────────
+function AndroidInstallBanner({ t, prompt, onDismiss }) {
+  const [installing, setInstalling] = React.useState(false);
+
+  async function install() {
+    if (!prompt) return;
+    setInstalling(true);
+    try {
+      prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === 'accepted') onDismiss();
+    } finally {
+      setInstalling(false);
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+      background: 'linear-gradient(180deg,#243d2e 0%,#172b20 100%)',
+      borderTop: '1px solid rgba(200,168,75,0.4)',
+      padding: '14px 16px calc(16px + env(safe-area-inset-bottom))',
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(180deg,#f0e8d5,#ddd0b0)', color: '#2a4038', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 22, flexShrink: 0 }}>麻</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, color: 'var(--gold)', fontSize: 14, marginBottom: 2 }}>{t.androidInstallTitle}</div>
+        <div style={{ fontSize: 12, color: 'var(--cream-dim)' }}>
+          {prompt ? t.androidInstallHint : t.androidInstallManual}
+        </div>
+      </div>
+      {prompt && (
+        <button
+          onClick={install}
+          disabled={installing}
+          style={{ background: 'var(--gold)', color: 'var(--felt-1)', border: 'none', borderRadius: 20, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>
+          {installing ? '...' : t.androidInstallBtn}
+        </button>
+      )}
+      <button onClick={onDismiss} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 22, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
     </div>
   );
 }
