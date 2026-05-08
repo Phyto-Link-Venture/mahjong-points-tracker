@@ -225,6 +225,17 @@ window.I18N = {
     // Point value
     pointValue: "Point value (RM)",
     pointValueHint: "Used for cash settlement",
+    // Join by code
+    joinTitle: "Watch a game",
+    joinHint: "Enter the 6-letter code from the host",
+    joinBtn: "Join",
+    joinError: "Code not found — check it and try again",
+    joinSetupBtn: "Watch a game →",
+    watchCode: "Watch code",
+    watchCodeHint: "Share this code — anyone can type it in the app to watch live",
+    watchCodeCopy: "Copy code",
+    watchCodeCopied: "Code copied!",
+    watchBack: "← Back",
     // iOS install banner
     iosInstallTitle: "Install on your iPhone",
     iosInstallHint: "Tap the Share button then \"Add to Home Screen\" to install for offline use.",
@@ -461,6 +472,17 @@ window.I18N = {
     // Point value
     pointValue: "分值（马币）",
     pointValueHint: "用于现金结算",
+    // Join by code
+    joinTitle: "观看游戏",
+    joinHint: "输入主机分享的6位代码",
+    joinBtn: "加入",
+    joinError: "代码无效，请检查后重试",
+    joinSetupBtn: "观看游戏 →",
+    watchCode: "观看代码",
+    watchCodeHint: "把这个代码分享给任何人，他们可以在应用内直接输入观看",
+    watchCodeCopy: "复制代码",
+    watchCodeCopied: "代码已复制！",
+    watchBack: "← 返回",
     // iOS install banner
     iosInstallTitle: "安装到主屏幕",
     iosInstallHint: "点击底部的分享按钮，然后选择「添加到主屏幕」即可离线使用。",

@@ -50,6 +50,8 @@ function App() {
   });
   const [androidPrompt, setAndroidPrompt] = useStateA(null);
   const [showAndroidBanner, setShowAndroidBanner] = useStateA(false);
+  const [watchingSessionId, setWatchingSessionId] = useStateA(null);
+  const [showJoin, setShowJoin] = useStateA(false);
 
   // Load session
   useEffectA(() => {
@@ -157,8 +159,12 @@ function App() {
         body: JSON.stringify({ shared: enable }),
       });
       if (res.ok) {
+        const data = await res.json();
         setSessionShared(enable);
-        setSettings(prev => ({ ...prev, shared: enable }));
+        setSettings(prev => ({
+          ...prev, shared: enable,
+          ...(data.watchCode ? { watchCode: data.watchCode } : {}),
+        }));
       }
     } catch {}
   }
@@ -223,9 +229,10 @@ function App() {
     });
   }
 
-  // Watch mode — spectator view
-  if (WATCH_ID) {
-    return <WatchView t={t} sessionId={WATCH_ID} lang={lang} setLang={setLang} />;
+  // Watch mode — spectator view (URL hash or in-app join by code)
+  if (WATCH_ID || watchingSessionId) {
+    return <WatchView t={t} sessionId={WATCH_ID || watchingSessionId} lang={lang} setLang={setLang}
+      onBack={watchingSessionId ? () => setWatchingSessionId(null) : null} />;
   }
 
   if (view === 'setup' || !settings) {
@@ -246,8 +253,15 @@ function App() {
         </div>
         <div className="content">
           <Setup t={t} lang={lang} onStart={startSession} />
+          <div style={{ textAlign: 'center', paddingBottom: 8 }}>
+            <button onClick={() => setShowJoin(true)}
+              style={{ background: 'transparent', border: '1px solid var(--felt-line)', color: 'var(--muted)', borderRadius: 20, padding: '8px 20px', fontSize: 13, cursor: 'pointer' }}>
+              👁 {t.joinSetupBtn}
+            </button>
+          </div>
         </div>
         {showAuth && <AuthModal t={t} authUser={authUser} onLogin={handleLogin} onLogout={handleLogout} onClose={() => setShowAuth(false)} />}
+        {showJoin && <JoinSheet t={t} onJoin={id => { setWatchingSessionId(id); setShowJoin(false); }} onClose={() => setShowJoin(false)} />}
         {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
         <IOSInstallBanner t={t} />
         {showAndroidBanner && <AndroidInstallBanner t={t} prompt={androidPrompt} onDismiss={dismissAndroidBanner} />}
@@ -378,7 +392,7 @@ function App() {
       )}
       {showShare && (
         <ShareSheet t={t} backendSessionId={backendSessionId} authToken={authToken}
-          shared={sessionShared} onToggle={toggleShare}
+          shared={sessionShared} watchCode={settings?.watchCode} onToggle={toggleShare}
           onClose={() => setShowShare(false)}
         />
       )}
@@ -416,16 +430,124 @@ function App() {
           />
         </TweakSection>
       </TweaksPanel>
+      {showJoin && <JoinSheet t={t} onJoin={id => { setWatchingSessionId(id); setShowJoin(false); }} onClose={() => setShowJoin(false)} />}
       {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
       <IOSInstallBanner t={t} />
+      {showAndroidBanner && <AndroidInstallBanner t={t} prompt={androidPrompt} onDismiss={dismissAndroidBanner} />}
+    </div>
+  );
+}
+
+// ── Join by code sheet ───────────────────────────────────────────────────────
+function JoinSheet({ t, onJoin, onClose }) {
+  const [chars, setChars] = React.useState(Array(6).fill(''));
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const inputRefs = React.useRef([]);
+
+  const code = chars.join('').toUpperCase();
+
+  function handleChange(i, e) {
+    const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(-1);
+    const next = [...chars];
+    next[i] = val;
+    setChars(next);
+    setError('');
+    if (val && i < 5) setTimeout(() => inputRefs.current[i + 1]?.focus(), 0);
+    if (next.join('').length === 6) setTimeout(() => submit(next.join('')), 50);
+  }
+
+  function handleKeyDown(i, e) {
+    if (e.key === 'Backspace' && !chars[i] && i > 0) {
+      inputRefs.current[i - 1]?.focus();
+    }
+  }
+
+  function handlePaste(e) {
+    const text = e.clipboardData.getData('text').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 6);
+    if (text.length === 6) {
+      setChars(text.split(''));
+      setTimeout(() => submit(text), 50);
+    }
+  }
+
+  async function submit(c) {
+    const finalCode = (c || code).replace(/\s/g, '');
+    if (finalCode.length !== 6) return;
+    setLoading(true); setError('');
+    try {
+      const res = await fetch(`${API}/watch/code/${finalCode}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Not found');
+      onJoin(data.session.id);
+    } catch {
+      setError(t.joinError);
+      setChars(Array(6).fill(''));
+      setTimeout(() => inputRefs.current[0]?.focus(), 0);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" style={{ zIndex: 300 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="sheet-header">
+          <h2>{t.joinTitle}</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="sheet-body" style={{ paddingTop: 8 }}>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0, marginBottom: 24, textAlign: 'center' }}>{t.joinHint}</p>
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 24 }} onPaste={handlePaste}>
+            {chars.map((c, i) => (
+              <input
+                key={i}
+                ref={el => inputRefs.current[i] = el}
+                value={c}
+                onChange={e => handleChange(i, e)}
+                onKeyDown={e => handleKeyDown(i, e)}
+                maxLength={2}
+                autoFocus={i === 0}
+                style={{
+                  width: 44, height: 56, textAlign: 'center', fontSize: 22, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: 0, padding: 0,
+                  background: c ? 'rgba(200,168,75,0.15)' : 'var(--felt-3)',
+                  border: '2px solid ' + (error ? 'var(--red)' : c ? 'var(--gold)' : 'var(--felt-line)'),
+                  borderRadius: 10, color: 'var(--cream)', outline: 'none',
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}
+              />
+            ))}
+          </div>
+
+          {error && <div style={{ textAlign: 'center', color: 'var(--red)', fontSize: 13, marginBottom: 16 }}>{error}</div>}
+
+          <button
+            className="btn btn-primary btn-block btn-lg"
+            onClick={() => submit()}
+            disabled={loading || code.length !== 6}
+            style={{ opacity: code.length !== 6 ? 0.4 : 1 }}
+          >
+            {loading ? '...' : t.joinBtn}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── Share sheet ─────────────────────────────────────────────────────────────
-function ShareSheet({ t, backendSessionId, authToken, shared, onToggle, onClose }) {
+function ShareSheet({ t, backendSessionId, authToken, shared, watchCode, onToggle, onClose }) {
   const [toast, setToast] = React.useState(null);
   const watchUrl = `${window.location.origin}${window.location.pathname}#watch/${backendSessionId}`;
+
+  function copyCode() {
+    navigator.clipboard.writeText(watchCode).then(() => {
+      setToast(t.watchCodeCopied);
+      setTimeout(() => setToast(null), 1800);
+    });
+  }
 
   function copyLink() {
     navigator.clipboard.writeText(watchUrl).then(() => {
@@ -433,6 +555,8 @@ function ShareSheet({ t, backendSessionId, authToken, shared, onToggle, onClose 
       setTimeout(() => setToast(null), 1800);
     });
   }
+
+  const formattedCode = watchCode ? watchCode.slice(0, 3) + ' ' + watchCode.slice(3) : '';
 
   return (
     <div className="sheet-backdrop" style={{ zIndex: 300 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -442,25 +566,40 @@ function ShareSheet({ t, backendSessionId, authToken, shared, onToggle, onClose 
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
         <div className="sheet-body">
-          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0, marginBottom: 20 }}>{t.shareHint}</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <button
-              className={"btn btn-block " + (shared ? "btn-secondary" : "btn-primary")}
-              onClick={() => onToggle(!shared)}
-            >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24 }}>
+            <button className={"btn btn-block " + (shared ? "btn-secondary" : "btn-primary")} onClick={() => onToggle(!shared)}>
               {shared ? t.shareDisable : t.shareEnable}
             </button>
           </div>
-          {shared && (
+
+          {shared && watchCode && (
             <div>
-              <div className="section-title">{t.shareLink}</div>
+              <div className="section-title">{t.watchCode}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{t.watchCodeHint}</div>
+
+              {/* Big code display */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: 'rgba(200,168,75,0.08)', border: '1px solid rgba(200,168,75,0.3)', borderRadius: 14, padding: '16px 18px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 34, fontWeight: 700, color: 'var(--gold)', letterSpacing: '0.18em' }}>
+                    {formattedCode}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                    {t.joinHint}
+                  </div>
+                </div>
+                <button onClick={copyCode}
+                  style={{ background: 'var(--gold)', color: 'var(--felt-1)', border: 'none', borderRadius: 10, padding: '10px 14px', fontWeight: 700, fontSize: 13, cursor: 'pointer', flexShrink: 0 }}>
+                  {t.watchCodeCopy}
+                </button>
+              </div>
+
+              {/* URL fallback */}
+              <div className="section-title" style={{ fontSize: 11 }}>{t.shareLink}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--felt-line)', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: 'var(--muted)', wordBreak: 'break-all', fontFamily: 'var(--mono)' }}>
+                <div style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--felt-line)', borderRadius: 8, padding: '8px 12px', fontSize: 10, color: 'var(--muted)', wordBreak: 'break-all', fontFamily: 'var(--mono)' }}>
                   {watchUrl}
                 </div>
-                <button className="btn btn-primary" onClick={copyLink} style={{ flexShrink: 0, padding: '10px 16px' }}>
-                  📋
-                </button>
+                <button className="btn btn-secondary" onClick={copyLink} style={{ flexShrink: 0, padding: '8px 12px', fontSize: 12 }}>📋</button>
               </div>
             </div>
           )}
@@ -502,7 +641,7 @@ function NotesSheet({ t, value, onChange, onClose }) {
 }
 
 // ── Watch view (spectator) ───────────────────────────────────────────────────
-function WatchView({ t, sessionId, lang, setLang }) {
+function WatchView({ t, sessionId, lang, setLang, onBack }) {
   const [session, setSession] = React.useState(null);
   const [error, setError] = React.useState('');
   const [lastUpdate, setLastUpdate] = React.useState(null);
@@ -563,6 +702,8 @@ function WatchView({ t, sessionId, lang, setLang }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <LangToggle lang={lang} setLang={setLang} />
           {lastUpdate && <span style={{ fontSize: 10, color: 'var(--muted)' }}>{lastUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
+          {onBack && <button onClick={onBack} style={{ background: 'transparent', border: '1px solid var(--felt-line)', color: 'var(--muted)', borderRadius: 16, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>{t.watchBack}</button>}
+
         </div>
       </div>
       <div className="content">

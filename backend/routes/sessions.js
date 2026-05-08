@@ -59,15 +59,24 @@ router.delete('/:id', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+function generateWatchCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I, O to avoid confusion
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 // Toggle sharing on a session
 router.patch('/:id/share', requireAuth, async (req, res) => {
   const { shared } = req.body;
   try {
     const session = await prisma.gameSession.findFirst({ where: { id: req.params.id, userId: req.user.id } });
     if (!session) return res.status(404).json({ error: 'Not found' });
-    const updatedSettings = { ...(session.settings || {}), shared: !!shared };
+    const existing = session.settings || {};
+    const watchCode = (shared && !existing.watchCode) ? generateWatchCode() : (existing.watchCode || null);
+    const updatedSettings = { ...existing, shared: !!shared, ...(watchCode ? { watchCode } : {}) };
     await prisma.gameSession.update({ where: { id: req.params.id }, data: { settings: updatedSettings } });
-    res.json({ ok: true, shared: !!shared });
+    res.json({ ok: true, shared: !!shared, watchCode: watchCode || null });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Server error' });
