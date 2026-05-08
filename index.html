@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Mahjong Points · 麻雀计分</title>
+  <title>Mahjong Points · 麻将计分</title>
   <meta name="theme-color" content="#1e3028" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="麻雀点数" />
+  <meta name="apple-mobile-web-app-title" content="麻将计分" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,6 +26,8 @@
   <!-- Google Identity Services (for Google Sign-In) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
+  <!-- QR code generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSe2oFDpMdDZpHBSQbPx0bBFAbgcMNZH8J/w==" crossorigin="anonymous"></script>
   <script src="config.js"></script>
   <script src="i18n.js"></script>
   <script src="scoring.js"></script>
@@ -39,6 +41,8 @@
   <script type="text/babel" src="auth-modal.jsx"></script>
   <script type="text/babel" src="stats-view.jsx"></script>
   <script type="text/babel" src="settlement.jsx"></script>
+  <script type="text/babel" src="chart.jsx"></script>
+  <script type="text/babel" src="summary.jsx"></script>
   <script type="text/babel" src="app.jsx"></script>
 
   <script>

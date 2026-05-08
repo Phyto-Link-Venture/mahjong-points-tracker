@@ -236,5 +236,8 @@ window.MJ = (function () {
     return txns;
   }
 
-  return { computeDeltas, computeTotals, dealerForRound, computeDealerIdx, calcSettlement, fanToPoints, effectiveFan };
+  // Player color palette — 8 distinct colors that read well on dark felt
+  const PLAYER_COLORS = ['#f4c430','#e05c5c','#5c9be0','#5ce08a','#b878e0','#e0965c','#5ce0d0','#e05caa'];
+
+  return { computeDeltas, computeTotals, dealerForRound, computeDealerIdx, calcSettlement, fanToPoints, effectiveFan, PLAYER_COLORS };
 })();

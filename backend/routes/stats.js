@@ -69,11 +69,39 @@ router.get('/', requireAuth, async (req, res) => {
     }
   }
 
+  // Head-to-head: for each pair (A,B), count wins when both in same session
+  const h2h = {}; // h2h[A][B] = { sessions, aWins, bWins }
+  for (const session of sessions) {
+    const players = session.players;
+    const rounds = session.rounds;
+    const winsByIdx = {};
+    for (const r of rounds) {
+      if ((r.outcome === 'self' || r.outcome === 'discard') && r.winnerIdx != null)
+        winsByIdx[r.winnerIdx] = (winsByIdx[r.winnerIdx] || 0) + 1;
+    }
+    for (let a = 0; a < players.length; a++) {
+      for (let b = a + 1; b < players.length; b++) {
+        const na = players[a], nb = players[b];
+        if (!h2h[na]) h2h[na] = {};
+        if (!h2h[nb]) h2h[nb] = {};
+        if (!h2h[na][nb]) h2h[na][nb] = { sessions: 0, aWins: 0, bWins: 0 };
+        if (!h2h[nb][na]) h2h[nb][na] = { sessions: 0, aWins: 0, bWins: 0 };
+        h2h[na][nb].sessions++;
+        h2h[na][nb].aWins += winsByIdx[a] || 0;
+        h2h[na][nb].bWins += winsByIdx[b] || 0;
+        h2h[nb][na].sessions++;
+        h2h[nb][na].aWins += winsByIdx[b] || 0;
+        h2h[nb][na].bWins += winsByIdx[a] || 0;
+      }
+    }
+  }
+
   const stats = Object.values(map).map(s => ({
     ...s,
     winRate: s.decidedRounds > 0 ? +(s.wins / s.decidedRounds * 100).toFixed(1) : 0,
     avgFan: s.wins > 0 ? +(s.totalFan / s.wins).toFixed(1) : 0,
     recentForm: playerSessions[s.name] || [],
+    h2h: h2h[s.name] || {},
   })).sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
 
   res.json({ stats, sessionCount: sessions.length });

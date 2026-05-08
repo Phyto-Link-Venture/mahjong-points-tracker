@@ -1,4 +1,4 @@
-const CACHE = 'mahjong-v4';
+const CACHE = 'mahjong-v5';
 const STATIC = [
   '/', '/index.html', '/styles.css', '/manifest.json',
   '/icon-192.png', '/icon-512.png',
@@ -6,7 +6,7 @@ const STATIC = [
   '/tweaks-panel.jsx', '/setup.jsx', '/fan-helper.jsx',
   '/round-entry.jsx', '/game.jsx', '/review.jsx',
   '/export.jsx', '/auth-modal.jsx', '/stats-view.jsx',
-  '/settlement.jsx', '/app.jsx',
+  '/settlement.jsx', '/chart.jsx', '/summary.jsx', '/app.jsx',
 ];
 
 self.addEventListener('install', e => {

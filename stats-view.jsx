@@ -172,6 +172,22 @@ function StatsTab({ t, authToken }) {
               </div>
             ))}
           </div>
+          {/* Head-to-head */}
+          {s.h2h && Object.keys(s.h2h).length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {Object.entries(s.h2h).slice(0, 4).map(([opp, rec]) => {
+                const total = rec.aWins + rec.bWins;
+                const winPct = total > 0 ? Math.round(rec.aWins / total * 100) : 50;
+                return (
+                  <span key={opp} style={{ fontSize: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--felt-line)', borderRadius: 8, padding: '3px 8px', color: 'var(--muted)', display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ color: 'var(--cream-dim)' }}>vs {opp.split(' ')[0]}</span>
+                    <span style={{ color: winPct >= 50 ? 'var(--green-pos)' : 'var(--red)', fontWeight: 600 }}>{winPct}%</span>
+                    <span style={{ opacity: 0.5 }}>({rec.sessions}g)</span>
+                  </span>
+                );
+              })}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             {s.selfDrawWins > 0 && (
               <span style={{ fontSize: 10, background: 'rgba(212,175,55,0.15)', color: 'var(--gold)', padding: '2px 8px', borderRadius: 10 }}>

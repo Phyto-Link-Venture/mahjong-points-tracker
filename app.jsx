@@ -52,6 +52,9 @@ function App() {
   const [showAndroidBanner, setShowAndroidBanner] = useStateA(false);
   const [watchingSessionId, setWatchingSessionId] = useStateA(null);
   const [showJoin, setShowJoin] = useStateA(false);
+  const [showSummary, setShowSummary] = useStateA(false);
+  const [undoBuffer, setUndoBuffer] = useStateA(null); // { round, timer }
+  const autoSyncTimer = React.useRef(null);
 
   // Load session
   useEffectA(() => {
@@ -84,6 +87,14 @@ function App() {
 
   useEffectA(() => {
     if (syncStatus === 'synced') setSyncStatus(null);
+  }, [rounds]);
+
+  // Auto-sync: trigger 2s after rounds change if logged in
+  useEffectA(() => {
+    if (!authToken || !settings || rounds.length === 0) return;
+    if (autoSyncTimer.current) clearTimeout(autoSyncTimer.current);
+    autoSyncTimer.current = setTimeout(() => { syncSession(); }, 2000);
+    return () => clearTimeout(autoSyncTimer.current);
   }, [rounds]);
 
   function dismissOnboarding() {
@@ -176,6 +187,7 @@ function App() {
   function startSession(cfg) {
     setSettings({
       mode: cfg.mode,
+      playerColors: cfg.playerColors || MJ.PLAYER_COLORS.slice(0, cfg.mode),
       minFan: cfg.minFan, maxFan: cfg.maxFan,
       basePoint: cfg.basePoint,
       pairwiseLoser: cfg.pairwiseLoser,
@@ -184,6 +196,7 @@ function App() {
       flowerPts: cfg.flowerPts, flyPts: cfg.flyPts,
       kongOpenPts: cfg.kongOpenPts, kongClosedPts: cfg.kongClosedPts,
       pointValue: cfg.pointValue || 0.10,
+      startedAt: Date.now(),
     });
     setPlayers(cfg.names);
     setRounds([]);
@@ -199,10 +212,21 @@ function App() {
       onYes: () => {
         setSettings(null); setPlayers([]); setRounds([]);
         setBackendSessionId(null); setSyncStatus(null); setSessionShared(false);
+        setShowSummary(false);
         setView('setup');
         try { localStorage.removeItem(STORAGE_KEY); } catch {}
       },
     });
+  }
+
+  function rematch() {
+    // Same players + colors + settings, fresh rounds
+    setRounds([]);
+    setBackendSessionId(null);
+    setSyncStatus(null);
+    setSessionShared(false);
+    setShowSummary(false);
+    setSettings(prev => ({ ...prev, startedAt: Date.now(), shared: false, watchCode: undefined }));
   }
 
   function saveRound(r) {
@@ -210,9 +234,19 @@ function App() {
     if (editingIdx != null) {
       const next = [...rounds]; next[editingIdx] = { ...next[editingIdx], ...stamped }; setRounds(next);
     } else {
-      setRounds([...rounds, stamped]);
+      setRounds(prev => [...prev, stamped]);
+      // Show undo toast for 4s
+      if (undoBuffer?.timer) clearTimeout(undoBuffer.timer);
+      const timer = setTimeout(() => setUndoBuffer(null), 4000);
+      setUndoBuffer({ round: stamped, timer });
     }
     setShowEntry(false); setEditingIdx(null);
+  }
+
+  function undoLastRound() {
+    if (undoBuffer?.timer) clearTimeout(undoBuffer.timer);
+    setRounds(prev => prev.filter(r => r.id !== undoBuffer.round.id));
+    setUndoBuffer(null);
   }
 
   function editRound(idx) {
@@ -303,7 +337,7 @@ function App() {
           lang={lang}
         />
 
-        {/* Action row: notes + settle + share */}
+        {/* Action row: notes + settle + share + finish */}
         {rounds.length > 0 && (
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', paddingBottom: 8, flexWrap: 'wrap' }}>
             <button onClick={() => setSessionNotesOpen(true)}
@@ -317,24 +351,28 @@ function App() {
             {authUser && backendSessionId && (
               <button onClick={() => setShowShare(true)}
                 style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, background: sessionShared ? 'rgba(200,168,75,0.15)' : 'transparent', border: '1px solid ' + (sessionShared ? 'var(--gold)' : 'var(--felt-line)'), color: sessionShared ? 'var(--gold)' : 'var(--muted)', cursor: 'pointer' }}>
-                {sessionShared ? '🔗 ' + t.shareEnable : '🔗 ' + t.shareEnable}
+                🔗 {sessionShared ? t.shareDisable : t.shareEnable}
               </button>
             )}
+            <button onClick={() => setShowSummary(true)}
+              style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, background: 'rgba(200,168,75,0.12)', border: '1px solid rgba(200,168,75,0.4)', color: 'var(--gold)', cursor: 'pointer', fontWeight: 600 }}>
+              🏆 {t.summaryBtn}
+            </button>
           </div>
         )}
 
-        {/* Cloud sync row */}
+        {/* Sync status — auto-sync does the work, show status only */}
         {authUser && rounds.length > 0 && (
           <div style={{ textAlign: 'center', paddingBottom: 16 }}>
-            <button onClick={syncSession} disabled={syncing}
-              style={{
-                fontSize: 12, padding: '5px 16px', borderRadius: 20, cursor: syncing ? 'default' : 'pointer',
-                background: 'transparent',
-                border: '1px solid ' + (syncStatus === 'synced' ? 'var(--gold)' : syncStatus === 'error' ? 'var(--red)' : 'var(--felt-line)'),
-                color: syncStatus === 'synced' ? 'var(--gold)' : syncStatus === 'error' ? 'var(--red)' : 'var(--muted)',
-              }}>
-              {syncing ? '...' : syncStatus === 'synced' ? '☁ ' + t.syncDone : syncStatus === 'error' ? t.syncError : '☁ ' + t.syncNow}
-            </button>
+            {syncing ? (
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>☁ {t.syncNow}…</span>
+            ) : syncStatus === 'error' ? (
+              <button onClick={syncSession} style={{ fontSize: 11, color: 'var(--red)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                {t.syncError}
+              </button>
+            ) : syncStatus === 'synced' ? (
+              <span style={{ fontSize: 11, color: 'var(--gold)', opacity: 0.7 }}>☁ {t.syncDone}</span>
+            ) : null}
           </div>
         )}
         {!authUser && rounds.length > 0 && (
@@ -430,7 +468,17 @@ function App() {
           />
         </TweakSection>
       </TweaksPanel>
+      {showSummary && (
+        <SummarySheet t={t} settings={settings} players={players} rounds={rounds}
+          onRematch={rematch} onClose={() => setShowSummary(false)} />
+      )}
       {showJoin && <JoinSheet t={t} onJoin={id => { setWatchingSessionId(id); setShowJoin(false); }} onClose={() => setShowJoin(false)} />}
+      {undoBuffer && (
+        <div className="undo-bar">
+          <span>{t.undoRoundAdded}</span>
+          <button onClick={undoLastRound}>{t.undo}</button>
+        </div>
+      )}
       {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
       <IOSInstallBanner t={t} />
       {showAndroidBanner && <AndroidInstallBanner t={t} prompt={androidPrompt} onDismiss={dismissAndroidBanner} />}
@@ -540,7 +588,18 @@ function JoinSheet({ t, onJoin, onClose }) {
 // ── Share sheet ─────────────────────────────────────────────────────────────
 function ShareSheet({ t, backendSessionId, authToken, shared, watchCode, onToggle, onClose }) {
   const [toast, setToast] = React.useState(null);
+  const qrRef = React.useRef(null);
   const watchUrl = `${window.location.origin}${window.location.pathname}#watch/${backendSessionId}`;
+
+  React.useEffect(() => {
+    if (!shared || !watchUrl || !qrRef.current || !window.QRCode) return;
+    qrRef.current.innerHTML = '';
+    new window.QRCode(qrRef.current, {
+      text: watchUrl, width: 160, height: 160,
+      colorDark: '#1e3028', colorLight: '#f0e8d5',
+      correctLevel: window.QRCode.CorrectLevel.M,
+    });
+  }, [shared, watchUrl]);
 
   function copyCode() {
     navigator.clipboard.writeText(watchCode).then(() => {
@@ -592,6 +651,12 @@ function ShareSheet({ t, backendSessionId, authToken, shared, watchCode, onToggl
                   {t.watchCodeCopy}
                 </button>
               </div>
+
+              {/* QR Code */}
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '16px 0 8px' }}>
+                <div ref={qrRef} style={{ background: '#f0e8d5', borderRadius: 10, padding: 8 }} />
+              </div>
+              <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>{t.qrScanHint}</div>
 
               {/* URL fallback */}
               <div className="section-title" style={{ fontSize: 11 }}>{t.shareLink}</div>
@@ -645,6 +710,8 @@ function WatchView({ t, sessionId, lang, setLang, onBack }) {
   const [session, setSession] = React.useState(null);
   const [error, setError] = React.useState('');
   const [lastUpdate, setLastUpdate] = React.useState(null);
+  const [floatingEmojis, setFloatingEmojis] = React.useState([]);
+  const seenReactions = React.useRef(new Set());
 
   async function load() {
     try {
@@ -654,9 +721,29 @@ function WatchView({ t, sessionId, lang, setLang, onBack }) {
       setSession(data.session);
       setLastUpdate(new Date());
       setError('');
+      // Trigger floating emoji for new reactions
+      if (data.reactions?.length) {
+        const newOnes = data.reactions.filter(r => !seenReactions.current.has(r.ts));
+        newOnes.forEach(r => {
+          seenReactions.current.add(r.ts);
+          const id = r.ts + Math.random();
+          const x = 20 + Math.random() * 60; // percent
+          setFloatingEmojis(prev => [...prev, { id, emoji: r.emoji, x }]);
+          setTimeout(() => setFloatingEmojis(prev => prev.filter(e => e.id !== id)), 2200);
+        });
+      }
     } catch (e) {
       setError(e.message);
     }
+  }
+
+  async function sendReaction(emoji) {
+    try { await fetch(`${API}/watch/${sessionId}/react`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emoji }) }); } catch {}
+    // Show locally immediately
+    const id = Date.now() + Math.random();
+    const x = 20 + Math.random() * 60;
+    setFloatingEmojis(prev => [...prev, { id, emoji, x }]);
+    setTimeout(() => setFloatingEmojis(prev => prev.filter(e => e.id !== id)), 2200);
   }
 
   useEffectA(() => {
@@ -724,6 +811,7 @@ function WatchView({ t, sessionId, lang, setLang, onBack }) {
             const v = totals[i];
             return (
               <div key={i} className={"player-tile " + (i === dealerIdx ? 'dealer' : '')}>
+                <div className="pcolor-bar" style={{ background: (settings.playerColors || MJ.PLAYER_COLORS)[i] }} />
                 {i === dealerIdx && <span className="pdealer-pin">{t.dealer}</span>}
                 <div className="seat">{seatLabels[i]}</div>
                 <div className="pname">{p}</div>
@@ -762,7 +850,19 @@ function WatchView({ t, sessionId, lang, setLang, onBack }) {
             </table>
           </div>
         )}
+
+        {/* Emoji reaction bar */}
+        <div className="emoji-bar">
+          {['🀄','🔥','😱','👏','💀'].map(e => (
+            <button key={e} className="emoji-btn" onClick={() => sendReaction(e)}>{e}</button>
+          ))}
+        </div>
       </div>
+
+      {/* Floating emoji animations */}
+      {floatingEmojis.map(fe => (
+        <div key={fe.id} className="emoji-float" style={{ left: `${fe.x}%`, bottom: '20%' }}>{fe.emoji}</div>
+      ))}
     </div>
   );
 }

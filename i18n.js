@@ -225,6 +225,15 @@ window.I18N = {
     // Point value
     pointValue: "Point value (RM)",
     pointValueHint: "Used for cash settlement",
+    // New features
+    summaryTitle: "Session summary",
+    summaryBtn: "Finish",
+    summaryRematch: "Same players, new game",
+    summaryKeepViewing: "Keep viewing",
+    summaryBest: "Best",
+    undo: "Undo",
+    undoRoundAdded: "Round recorded",
+    qrScanHint: "Scan to watch on any device",
     // Join by code
     joinTitle: "Watch a game",
     joinHint: "Enter the 6-letter code from the host",
@@ -254,8 +263,8 @@ window.I18N = {
     onboardGotIt: "Got it — let's play!",
   },
   zh: {
-    appName: "麻雀计分",
-    appTagline: "马来西亚三人 / 四人麻雀",
+    appName: "麻将计分",
+    appTagline: "马来西亚三人 / 四人麻将",
     setupTitle: "新对局",
     setupSubtitle: "先设定一次，规则之后可调整。",
     gameMode: "游戏模式",
@@ -472,6 +481,15 @@ window.I18N = {
     // Point value
     pointValue: "分值（马币）",
     pointValueHint: "用于现金结算",
+    // New features
+    summaryTitle: "对局总结",
+    summaryBtn: "结束",
+    summaryRematch: "相同玩家，再来一局",
+    summaryKeepViewing: "继续查看",
+    summaryBest: "最高",
+    undo: "撤销",
+    undoRoundAdded: "已记录",
+    qrScanHint: "扫码即可在任意设备观看",
     // Join by code
     joinTitle: "观看游戏",
     joinHint: "输入主机分享的6位代码",
@@ -493,7 +511,7 @@ window.I18N = {
     androidInstallBtn: "安装",
     androidInstallManual: "或：Chrome 菜单 (⋮) → 添加到主屏幕",
     // Onboarding
-    onboardTitle: "欢迎使用麻雀计分",
+    onboardTitle: "欢迎使用麻将计分",
     onboardStep1: "设置玩家后，点击「开始对局」",
     onboardStep2: "每局结束后，点击底栏的 + 「记录此局」",
     onboardStep3: "结束时点击 💰「结算」查看谁付给谁",

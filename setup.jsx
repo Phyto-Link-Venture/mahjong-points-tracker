@@ -25,6 +25,7 @@ function Setup({ t, lang, onStart, initial }) {
   const [mode, setMode] = useState(initial?.mode || 4);
   const seatLabels = (m) => m === 3 ? [t.east, t.south, t.west] : [t.east, t.south, t.west, t.north];
   const [names, setNames] = useState(initial?.names || ["", "", "", ""]);
+  const [playerColors, setPlayerColors] = useState(initial?.playerColors || MJ.PLAYER_COLORS.slice(0, 4));
   const [minFan, setMinFan] = useState(initial?.minFan ?? 5);
   const [maxFan, setMaxFan] = useState(initial?.maxFan ?? 10);
   const [basePoint, setBasePoint] = useState(initial?.basePoint ?? 1);
@@ -43,6 +44,7 @@ function Setup({ t, lang, onStart, initial }) {
     const playerNames = seats.map((s, i) => names[i]?.trim() || s);
     onStart({
       mode, names: playerNames,
+      playerColors: playerColors.slice(0, mode),
       minFan: Number(minFan), maxFan: Number(maxFan),
       basePoint: Number(basePoint),
       pairwiseLoser, discardShare, dealerHold,
@@ -76,16 +78,24 @@ function Setup({ t, lang, onStart, initial }) {
       <div className="section">
         <div className="section-title">{t.players}</div>
         {seats.map((s, i) => (
-          <div className="player-input-row" key={i}>
-            <div className="seat-badge">{s}</div>
-            <input
-              type="text"
-              placeholder={`${t.playerName} ${i + 1}`}
-              value={names[i] || ""}
-              onChange={(e) => {
-                const n = [...names]; n[i] = e.target.value; setNames(n);
-              }}
-            />
+          <div key={i} style={{ marginBottom: 10 }}>
+            <div className="player-input-row" style={{ marginBottom: 6 }}>
+              <div className="seat-badge" style={{ borderBottom: `3px solid ${playerColors[i] || MJ.PLAYER_COLORS[i]}` }}>{s}</div>
+              <input
+                type="text"
+                placeholder={`${t.playerName} ${i + 1}`}
+                value={names[i] || ""}
+                onChange={(e) => { const n = [...names]; n[i] = e.target.value; setNames(n); }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 6, paddingLeft: 68 }}>
+              {MJ.PLAYER_COLORS.map((c, ci) => (
+                <button key={ci} className={"color-dot" + (playerColors[i] === c ? " selected" : "")}
+                  style={{ background: c }}
+                  onClick={() => { const nc = [...playerColors]; nc[i] = c; setPlayerColors(nc); }}
+                />
+              ))}
+            </div>
           </div>
         ))}
       </div>
