@@ -8,7 +8,6 @@ const API = '/api';
 // Check if opened as a spectator watch link
 const watchMatch = window.location.hash.match(/^#watch\/(.+)$/);
 const WATCH_ID = watchMatch ? watchMatch[1] : null;
-const VERIFY_RESULT = window.location.hash.startsWith('#verified=') ? window.location.hash.split('=')[1] : null;
 
 function App() {
   const [lang, setLang] = useStateA(() => {
@@ -55,7 +54,6 @@ function App() {
   const [showJoin, setShowJoin] = useStateA(false);
   const [showSummary, setShowSummary] = useStateA(false);
   const [showFeedback, setShowFeedback] = useStateA(false);
-  const [verifyToast, setVerifyToast] = useStateA(VERIFY_RESULT);
   const [undoBuffer, setUndoBuffer] = useStateA(null); // { round, timer }
   const autoSyncTimer = React.useRef(null);
 
@@ -99,14 +97,6 @@ function App() {
     autoSyncTimer.current = setTimeout(() => { syncSession(); }, 2000);
     return () => clearTimeout(autoSyncTimer.current);
   }, [rounds]);
-
-  useEffectA(() => {
-    if (!verifyToast) return;
-    if (verifyToast === '1') setAuthUser(prev => prev ? { ...prev, emailVerified: true } : prev);
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-    const tid = setTimeout(() => setVerifyToast(null), 4000);
-    return () => clearTimeout(tid);
-  }, [verifyToast]);
 
   function dismissOnboarding() {
     setShowOnboarding(false);
@@ -315,8 +305,6 @@ function App() {
         {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
         <IOSInstallBanner t={t} />
         {showAndroidBanner && <AndroidInstallBanner t={t} prompt={androidPrompt} onDismiss={dismissAndroidBanner} />}
-        {authUser && authUser.emailVerified === false && <EmailVerifyBanner t={t} authToken={authToken} />}
-        {verifyToast === '1' && <div className="toast" style={{ background: 'var(--gold)', color: 'var(--felt-1)' }}>{t.emailVerifySuccess}</div>}
       </div>
     );
   }
@@ -505,8 +493,6 @@ function App() {
       {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
       <IOSInstallBanner t={t} />
       {showAndroidBanner && <AndroidInstallBanner t={t} prompt={androidPrompt} onDismiss={dismissAndroidBanner} />}
-      {authUser && authUser.emailVerified === false && <EmailVerifyBanner t={t} authToken={authToken} />}
-      {verifyToast === '1' && <div className="toast" style={{ background: 'var(--gold)', color: 'var(--felt-1)' }}>{t.emailVerifySuccess}</div>}
     </div>
   );
 }
@@ -1101,43 +1087,6 @@ function FeedbackSheet({ t, authToken, onClose }) {
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-// ── Email verify banner ──────────────────────────────────────────────────────
-function EmailVerifyBanner({ t, authToken }) {
-  const [dismissed, setDismissed] = React.useState(false);
-  const [sent, setSent] = React.useState(false);
-  const [busy, setBusy] = React.useState(false);
-  if (dismissed) return null;
-
-  async function resend() {
-    if (!authToken || busy) return;
-    setBusy(true);
-    try {
-      await fetch(`${API}/auth/resend-verify`, { method: 'POST', headers: { Authorization: `Bearer ${authToken}` } });
-      setSent(true);
-      setTimeout(() => setSent(false), 5000);
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 8000,
-      background: 'rgba(160,100,10,0.97)',
-      padding: 'calc(8px + env(safe-area-inset-top)) 16px 10px',
-      display: 'flex', alignItems: 'center', gap: 10,
-    }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, color: '#fff', fontSize: 13 }}>{t.emailVerifyBanner}</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>{t.emailVerifyBannerHint}</div>
-      </div>
-      <button onClick={resend} disabled={busy}
-        style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', color: '#fff', borderRadius: 14, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-        {sent ? t.emailVerifyResent : busy ? '...' : t.emailVerifyResend}
-      </button>
-      <button onClick={() => setDismissed(true)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 20, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
     </div>
   );
 }
