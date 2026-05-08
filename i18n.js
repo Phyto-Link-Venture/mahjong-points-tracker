@@ -225,6 +225,17 @@ window.I18N = {
     // Point value
     pointValue: "Point value (RM)",
     pointValueHint: "Used for cash settlement",
+    // iOS install banner
+    iosInstallTitle: "Install on your iPhone",
+    iosInstallHint: "Tap the Share button then \"Add to Home Screen\" to install for offline use.",
+    iosInstallDismiss: "Maybe later",
+    // Onboarding
+    onboardTitle: "Welcome to Mahjong Points",
+    onboardStep1: "Set up your players, then tap Start Session",
+    onboardStep2: "After each hand, tap + Record Round in the bottom bar",
+    onboardStep3: "When you're done, tap 💰 Settle to see who pays who",
+    onboardStep4: "Tap 👤 to sign in and save session history across devices",
+    onboardGotIt: "Got it — let's play!",
   },
   zh: {
     appName: "麻雀计分",
@@ -445,5 +456,16 @@ window.I18N = {
     // Point value
     pointValue: "分值（马币）",
     pointValueHint: "用于现金结算",
+    // iOS install banner
+    iosInstallTitle: "安装到主屏幕",
+    iosInstallHint: "点击底部的分享按钮，然后选择「添加到主屏幕」即可离线使用。",
+    iosInstallDismiss: "稍后再说",
+    // Onboarding
+    onboardTitle: "欢迎使用麻雀计分",
+    onboardStep1: "设置玩家后，点击「开始对局」",
+    onboardStep2: "每局结束后，点击底栏的 + 「记录此局」",
+    onboardStep3: "结束时点击 💰「结算」查看谁付给谁",
+    onboardStep4: "点击 👤 登录，跨设备保存对局记录",
+    onboardGotIt: "明白了，开始打牌！",
   }
 };

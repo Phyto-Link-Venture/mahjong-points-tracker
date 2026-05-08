@@ -45,6 +45,9 @@ function App() {
   const [syncing, setSyncing] = useStateA(false);
   const [syncStatus, setSyncStatus] = useStateA(null);
   const [sessionShared, setSessionShared] = useStateA(false);
+  const [showOnboarding, setShowOnboarding] = useStateA(() => {
+    try { return !localStorage.getItem('mahjong-onboarded'); } catch { return false; }
+  });
 
   // Load session
   useEffectA(() => {
@@ -78,6 +81,11 @@ function App() {
   useEffectA(() => {
     if (syncStatus === 'synced') setSyncStatus(null);
   }, [rounds]);
+
+  function dismissOnboarding() {
+    setShowOnboarding(false);
+    try { localStorage.setItem('mahjong-onboarded', '1'); } catch {}
+  }
 
   function handleLogin(user, token) {
     setAuthUser(user);
@@ -218,6 +226,8 @@ function App() {
           <Setup t={t} lang={lang} onStart={startSession} />
         </div>
         {showAuth && <AuthModal t={t} authUser={authUser} onLogin={handleLogin} onLogout={handleLogout} onClose={() => setShowAuth(false)} />}
+        {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
+        <IOSInstallBanner t={t} />
       </div>
     );
   }
@@ -383,6 +393,8 @@ function App() {
           />
         </TweakSection>
       </TweaksPanel>
+      {showOnboarding && <OnboardingModal t={t} onDone={dismissOnboarding} />}
+      <IOSInstallBanner t={t} />
     </div>
   );
 }
@@ -586,6 +598,85 @@ function WatchView({ t, sessionId, lang, setLang }) {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── iOS install banner ───────────────────────────────────────────────────────
+function IOSInstallBanner({ t }) {
+  const [visible, setVisible] = React.useState(() => {
+    try {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isStandalone = window.navigator.standalone;
+      const dismissed = localStorage.getItem('pwa-ios-dismissed');
+      const isSafari = isIOS && /WebKit/.test(navigator.userAgent) && !/CriOS|FxiOS|OPiOS/.test(navigator.userAgent);
+      return isSafari && !isStandalone && !dismissed;
+    } catch { return false; }
+  });
+
+  if (!visible) return null;
+
+  function dismiss() {
+    setVisible(false);
+    try { localStorage.setItem('pwa-ios-dismissed', '1'); } catch {}
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
+      background: 'linear-gradient(180deg,#243d2e 0%,#172b20 100%)',
+      borderTop: '1px solid rgba(200,168,75,0.4)',
+      padding: '14px 16px 32px',
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+    }}>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(180deg,#f0e8d5,#ddd0b0)', color: '#2a4038', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontWeight: 700, fontSize: 22, flexShrink: 0 }}>麻</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, color: 'var(--gold)', fontSize: 14, marginBottom: 4 }}>{t.iosInstallTitle}</div>
+        <div style={{ fontSize: 12, color: 'var(--cream-dim)', lineHeight: 1.6 }}>
+          {t.iosInstallHint}
+        </div>
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>Safari</span>
+          <span style={{ fontSize: 18, color: 'var(--cream-dim)' }}>→</span>
+          <span style={{ background: 'rgba(0,122,255,0.2)', border: '1px solid rgba(0,122,255,0.5)', borderRadius: 6, padding: '2px 8px', fontSize: 11, color: '#4da8ff', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 14 }}>⬆</span> Share
+          </span>
+          <span style={{ fontSize: 18, color: 'var(--cream-dim)' }}>→</span>
+          <span style={{ background: 'rgba(200,168,75,0.15)', border: '1px solid rgba(200,168,75,0.35)', borderRadius: 6, padding: '2px 8px', fontSize: 11, color: 'var(--gold)' }}>
+            Add to Home Screen
+          </span>
+        </div>
+      </div>
+      <button onClick={dismiss} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 22, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0, marginTop: -2 }}>×</button>
+    </div>
+  );
+}
+
+// ── Onboarding modal ─────────────────────────────────────────────────────────
+function OnboardingModal({ t, onDone }) {
+  const steps = [
+    { icon: '⚙', text: t.onboardStep1 },
+    { icon: '+', text: t.onboardStep2 },
+    { icon: '💰', text: t.onboardStep3 },
+    { icon: '👤', text: t.onboardStep4 },
+  ];
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'flex-end' }}>
+      <div style={{ width: '100%', background: 'linear-gradient(180deg,#243d2e 0%,#172b20 100%)', borderRadius: '20px 20px 0 0', padding: '28px 20px 40px', borderTop: '1px solid rgba(200,168,75,0.35)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ fontSize: 36, fontFamily: 'var(--serif)', color: 'var(--gold)', marginBottom: 10 }}>麻</div>
+          <h2 style={{ margin: 0, color: 'var(--cream)', fontSize: 19, fontFamily: 'var(--serif)' }}>{t.onboardTitle}</h2>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 28 }}>
+          {steps.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(200,168,75,0.12)', border: '1px solid rgba(200,168,75,0.3)', color: 'var(--gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{s.icon}</div>
+              <div style={{ fontSize: 13, color: 'var(--cream-dim)', lineHeight: 1.55 }}>{s.text}</div>
+            </div>
+          ))}
+        </div>
+        <button className="btn btn-primary btn-block btn-lg" onClick={onDone}>{t.onboardGotIt}</button>
       </div>
     </div>
   );
