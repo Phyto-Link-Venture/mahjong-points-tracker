@@ -1,6 +1,20 @@
 // Round entry sheet
 const { useState: useStateRE, useMemo: useMemoRE } = React;
 
+function migrateBonuses(bonuses, N) {
+  const base = Array(N).fill(null).map(() => ({ flowers: 0, flies: 0, openKongs: 0, fedKongFeeders: {}, closedKongs: 0 }));
+  if (!bonuses) return base;
+  return bonuses.map((b, i) => {
+    if (!b) return base[i];
+    // Migrate old single-feeder format to per-feeder map
+    let fedKongFeeders = b.fedKongFeeders ? { ...b.fedKongFeeders } : {};
+    if (Object.keys(fedKongFeeders).length === 0 && b.fedKongFeeder != null && (b.fedKongs || 0) > 0) {
+      fedKongFeeders[b.fedKongFeeder] = b.fedKongs;
+    }
+    return { flowers: b.flowers || 0, flies: b.flies || 0, openKongs: b.openKongs || 0, fedKongFeeders, closedKongs: b.closedKongs || 0 };
+  });
+}
+
 function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel, simpleMode }) {
   const N = settings.mode;
   const [outcome, setOutcome] = useStateRE(initial?.outcome || 'self');
@@ -8,7 +22,7 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
   const [discarderIdx, setDiscarderIdx] = useStateRE(initial?.discarderIdx ?? null);
   const [fan, setFan] = useStateRE(initial?.fan ?? settings.minFan);
   const [loserFans, setLoserFans] = useStateRE(initial?.loserFans || {});
-  const [bonuses, setBonuses] = useStateRE(initial?.bonuses || Array(N).fill(null).map(() => ({ flowers: 0, flies: 0, openKongs: 0, fedKongs: 0, fedKongFeeder: null, closedKongs: 0 })));
+  const [bonuses, setBonuses] = useStateRE(() => migrateBonuses(initial?.bonuses, N));
   const [penaltyIdx, setPenaltyIdx] = useStateRE(initial?.penaltyIdx ?? null);
   const [penaltyPoints, setPenaltyPoints] = useStateRE(initial?.penaltyPoints ?? 10);
   const [notes, setNotes] = useStateRE(initial?.notes || "");
@@ -26,6 +40,17 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
     const next = bonuses.map(b => ({ ...b }));
     next[i][key] = value;
     setBonuses(next);
+  }
+  function fedKongFeederStep(playerIdx, feederIdx, delta) {
+    const next = bonuses.map(b => ({ ...b, fedKongFeeders: { ...(b.fedKongFeeders || {}) } }));
+    const current = next[playerIdx].fedKongFeeders[feederIdx] || 0;
+    const nv = Math.max(0, current + delta);
+    if (nv === 0) delete next[playerIdx].fedKongFeeders[feederIdx];
+    else next[playerIdx].fedKongFeeders[feederIdx] = nv;
+    setBonuses(next);
+  }
+  function getFedKongsTotal(i) {
+    return Object.values(bonuses[i]?.fedKongFeeders || {}).reduce((a, c) => a + c, 0);
   }
 
   const previewDeltas = useMemoRE(() => {
@@ -53,7 +78,10 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
       discarderIdx: outcome === 'discard' ? discarderIdx : null,
       fan: Number(fan),
       loserFans,
-      bonuses,
+      bonuses: bonuses.map(b => ({
+        ...b,
+        fedKongs: Object.values(b.fedKongFeeders || {}).reduce((a, c) => a + c, 0),
+      })),
       penaltyIdx: outcome === 'penalty' ? penaltyIdx : null,
       penaltyPoints: Number(penaltyPoints),
       simpleMode,
@@ -227,8 +255,8 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
                     <th>{t.flowers}</th>
                     {N === 3 && <th>{t.flies}</th>}
                     <th>{t.openKongs}</th>
-                    <th>{t.fedKongsCol}</th>
                     <th>{t.closedKongs}</th>
+                    <th>{t.fedKongsCol}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -236,7 +264,7 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
                     <React.Fragment key={i}>
                       <tr>
                         <td>{p}</td>
-                        {['flowers', N === 3 ? 'flies' : null, 'openKongs', 'fedKongs', 'closedKongs'].filter(Boolean).map(k => (
+                        {['flowers', N === 3 ? 'flies' : null, 'openKongs', 'closedKongs'].filter(Boolean).map(k => (
                           <td key={k}>
                             <div className="bonus-stepper">
                               <button onClick={() => bonusStep(i, k, -1)}>−</button>
@@ -245,28 +273,33 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
                             </div>
                           </td>
                         ))}
+                        {/* Fed Kong column: shows total, editing done in expanded row */}
+                        <td>
+                          {getFedKongsTotal(i) > 0 ? (
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--cream)' }}>{getFedKongsTotal(i)}</span>
+                          ) : (
+                            <span style={{ color: 'var(--muted)', fontSize: 13 }}>—</span>
+                          )}
+                        </td>
                       </tr>
-                      {(bonuses[i]?.fedKongs || 0) > 0 && (
-                        <tr>
-                          <td colSpan={N === 3 ? 5 : 5} style={{ paddingTop: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0 8px', flexWrap: 'wrap' }}>
-                              <span style={{ color: 'var(--muted)', fontSize: 11 }}>↳ {t.feeder}:</span>
-                              {players.map((pp, j) => j === i ? null : (
-                                <button
-                                  key={j}
-                                  className={"feeder-chip" + (bonuses[i]?.fedKongFeeder === j ? " active" : "")}
-                                  onClick={() => setBonusField(i, 'fedKongFeeder', bonuses[i]?.fedKongFeeder === j ? null : j)}
-                                >
-                                  {pp}
-                                </button>
-                              ))}
-                              {bonuses[i]?.fedKongFeeder == null && (
-                                <span style={{ color: 'var(--red)', fontSize: 10 }}>· {t.pickFeeder}</span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+                      {/* Per-feeder fed kong steppers */}
+                      <tr>
+                        <td colSpan={N === 3 ? 6 : 5} style={{ paddingTop: 0, paddingBottom: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingTop: 2 }}>
+                            <span style={{ color: 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap' }}>↳ {t.fedKongsHint2}:</span>
+                            {players.map((pp, j) => j === i ? null : (
+                              <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <span style={{ fontSize: 11, color: 'var(--cream-dim)', maxWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pp}</span>
+                                <div className="bonus-stepper">
+                                  <button onClick={() => fedKongFeederStep(i, j, -1)}>−</button>
+                                  <span className="v">{bonuses[i]?.fedKongFeeders?.[j] || 0}</span>
+                                  <button onClick={() => fedKongFeederStep(i, j, +1)}>+</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
                     </React.Fragment>
                   ))}
                 </tbody>

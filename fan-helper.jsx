@@ -50,7 +50,7 @@ function getFanCategories(N, t) {
   ];
 }
 
-function FanHelper({ t, settings, onUse, onClose }) {
+function FanHelper({ t, settings, onUse, onClose, standalone }) {
   const [selected, setSelected] = useStateFH({});
   const N = settings.mode;
   const categories = getFanCategories(N, t);
@@ -142,15 +142,23 @@ function FanHelper({ t, settings, onUse, onClose }) {
           ))}
         </div>
         <div className="sheet-footer">
-          <button className="btn btn-secondary" onClick={onClose}>{t.cancel}</button>
-          <button
-            className="btn btn-primary btn-block"
-            onClick={() => onUse(total)}
-            disabled={total === 0}
-            style={{ opacity: total > 0 ? 1 : 0.5 }}
-          >
-            {t.fhUse} {total} {t.fanShort}
-          </button>
+          {standalone ? (
+            <button className="btn btn-primary btn-block" onClick={onClose}>
+              {total > 0 ? `${t.fanCounterGotIt} · ${total} ${t.fanShort}` : t.fanCounterGotIt}
+            </button>
+          ) : (
+            <>
+              <button className="btn btn-secondary" onClick={onClose}>{t.cancel}</button>
+              <button
+                className="btn btn-primary btn-block"
+                onClick={() => onUse(total)}
+                disabled={total === 0}
+                style={{ opacity: total > 0 ? 1 : 0.5 }}
+              >
+                {t.fhUse} {total} {t.fanShort}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -25,6 +25,7 @@ function App() {
   const [editingIdx, setEditingIdx] = useStateA(null);
   const [showReview, setShowReview] = useStateA(false);
   const [showExport, setShowExport] = useStateA(false);
+  const [showFanCounter, setShowFanCounter] = useStateA(false);
   const [confirm, setConfirm] = useStateA(null);
 
   // Auth state
@@ -258,6 +259,7 @@ function App() {
         <button className="fab" onClick={() => { setEditingIdx(null); setShowEntry(true); }}>
           + {t.recordRound}
         </button>
+        <button className="nav-icon" title={t.fanCounterBtn} onClick={() => setShowFanCounter(true)} style={{ fontSize: 14, fontFamily: 'var(--serif)' }}>番</button>
         <button className="nav-icon" title={t.export} onClick={() => setShowExport(true)}>↗</button>
         <button className="nav-icon" title={t.newSession} onClick={newSession}>⟲</button>
       </div>
@@ -284,6 +286,17 @@ function App() {
         <ExportSheet
           t={t} settings={settings} players={players} rounds={rounds}
           onClose={() => setShowExport(false)}
+        />
+      )}
+      {showFanCounter && (
+        <FanHelper
+          t={t}
+          settings={settings}
+          standalone={true}
+          onUse={(f) => {
+            setShowFanCounter(false);
+          }}
+          onClose={() => setShowFanCounter(false)}
         />
       )}
       {showAuth && (

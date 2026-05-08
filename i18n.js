@@ -97,6 +97,7 @@ window.I18N = {
     exportTitle: "Export",
     exportText: "Copy as text",
     exportImage: "Save as image",
+    exportImageSaved: "Image saved!",
     copied: "Copied!",
     // misc
     dealer: "Dealer",
@@ -170,6 +171,30 @@ window.I18N = {
     statsEmpty: "No data yet — sync a session first",
     statsNoMatch: "No players matching search",
     statsSyncHint: "Sync a session from the game screen to see stats here",
+    // Tabs in stats modal
+    tabStats: "Stats",
+    tabHistory: "History",
+    tabPlayers: "Players",
+    // History
+    historyEmpty: "No sessions yet — sync a game to see history",
+    historyRounds: "rounds",
+    historyDelete: "Delete",
+    historyDeleteConfirm: "Delete this session? Stats will be updated.",
+    historyView: "View",
+    historyCollapse: "Close",
+    // Player management
+    playerMgmtHint: "Rename a player to merge duplicate names (e.g. 'Andy' → 'Andy Lau'). This updates all your synced sessions.",
+    playerRenameBtn: "Rename",
+    playerRenameTo: "New name",
+    playerRenameConfirm: "Rename",
+    playerRenameSuccess: "Renamed!",
+    playerRenameCancel: "Cancel",
+    // Fed Kong
+    fedKongsHint2: "Fed by",
+    // Fan counter
+    fanCounterBtn: "Count fans",
+    fanCounterGotIt: "Done",
+    fanCounterToast: "Fan count:",
   },
   zh: {
     appName: "麻雀计分",
@@ -319,6 +344,8 @@ window.I18N = {
     syncDone: "已同步 ✓",
     syncError: "同步失败，点击重试",
     syncLoginPrompt: "登录后可将记录保存到云端",
+    // Export
+    exportImageSaved: "图片已保存！",
     // Stats
     statsTitle: "玩家统计",
     statsSessions: "场已同步",
@@ -334,5 +361,29 @@ window.I18N = {
     statsEmpty: "暂无数据，请先同步对局",
     statsNoMatch: "未找到匹配玩家",
     statsSyncHint: "在游戏界面同步对局后，即可在此查看统计",
+    // Tabs
+    tabStats: "统计",
+    tabHistory: "记录",
+    tabPlayers: "玩家",
+    // History
+    historyEmpty: "暂无记录，请先同步对局",
+    historyRounds: "局",
+    historyDelete: "删除",
+    historyDeleteConfirm: "删除此场记录？统计将更新。",
+    historyView: "查看",
+    historyCollapse: "收起",
+    // Player management
+    playerMgmtHint: "重命名玩家可合并重复名字（如「Andy」→「Andy Lau」），所有同步记录将更新。",
+    playerRenameBtn: "重命名",
+    playerRenameTo: "新名字",
+    playerRenameConfirm: "确认",
+    playerRenameSuccess: "已更新！",
+    playerRenameCancel: "取消",
+    // Fed Kong
+    fedKongsHint2: "放杠来自",
+    // Fan counter
+    fanCounterBtn: "算番",
+    fanCounterGotIt: "好的",
+    fanCounterToast: "番数：",
   }
 };

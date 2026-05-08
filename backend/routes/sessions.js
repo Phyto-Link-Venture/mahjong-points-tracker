@@ -39,9 +39,18 @@ router.get('/', requireAuth, async (req, res) => {
     where: { userId: req.user.id },
     orderBy: { startedAt: 'desc' },
     take: 100,
-    select: { id: true, mode: true, players: true, startedAt: true, syncedAt: true },
+    select: { id: true, mode: true, players: true, rounds: true, settings: true, startedAt: true, syncedAt: true },
   });
   res.json({ sessions });
+});
+
+// Get single session (full detail)
+router.get('/:id', requireAuth, async (req, res) => {
+  const session = await prisma.gameSession.findFirst({
+    where: { id: req.params.id, userId: req.user.id },
+  });
+  if (!session) return res.status(404).json({ error: 'Not found' });
+  res.json({ session });
 });
 
 // Delete a session

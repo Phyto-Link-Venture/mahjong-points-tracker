@@ -167,13 +167,25 @@ window.MJ = (function () {
           deltas[j] -= flatPts;
         }
       }
-      const fedCount = b.fedKongs || 0;
-      const feeder = b.fedKongFeeder;
-      if (fedCount > 0 && feeder != null && feeder !== i) {
-        // Feeder pays 2× kongOpenPts per fed kong; other players pay nothing
-        const pay = 2 * settings.kongOpenPts * fedCount;
-        deltas[i] += pay;
-        deltas[feeder] -= pay;
+      // Per-feeder fed kongs (new format)
+      if (b.fedKongFeeders && Object.keys(b.fedKongFeeders).length > 0) {
+        for (const [feederStr, count] of Object.entries(b.fedKongFeeders)) {
+          const feeder = parseInt(feederStr);
+          if (count > 0 && feeder !== i) {
+            const pay = 2 * settings.kongOpenPts * count;
+            deltas[i] += pay;
+            deltas[feeder] -= pay;
+          }
+        }
+      } else {
+        // Backward compat: old single-feeder format
+        const fedCount = b.fedKongs || 0;
+        const feeder = b.fedKongFeeder;
+        if (fedCount > 0 && feeder != null && feeder !== i) {
+          const pay = 2 * settings.kongOpenPts * fedCount;
+          deltas[i] += pay;
+          deltas[feeder] -= pay;
+        }
       }
     }
   }
