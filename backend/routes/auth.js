@@ -18,7 +18,7 @@ function makeToken(user) {
 }
 
 function safeUser(u) {
-  return { id: u.id, email: u.email, name: u.name, createdAt: u.createdAt, emailVerified: u.emailVerified };
+  return { id: u.id, email: u.email, name: u.name, createdAt: u.createdAt, emailVerified: u.emailVerified ?? true };
 }
 
 function makeVerifyToken() {

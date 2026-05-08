@@ -16,6 +16,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd /var/www/mahjong-points-tracker
             git pull origin main
             docker build -t mahjong-backend ./backend

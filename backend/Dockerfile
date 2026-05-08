@@ -7,4 +7,4 @@ COPY prisma ./prisma
 RUN npx prisma generate
 COPY . .
 EXPOSE 3002
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node server.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate 2>&1 || echo '[startup] db push failed, starting server anyway'; node server.js"]
