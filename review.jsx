@@ -37,6 +37,12 @@ function Review({ t, settings, players, rounds, onEdit, onDelete, onClose }) {
             </div>
           )}
 
+          {settings.sessionNotes && (
+            <div style={{ fontSize: 12, color: 'var(--cream-dim)', fontStyle: 'italic', margin: '0 0 12px', padding: '8px 12px', background: 'rgba(0,0,0,0.15)', borderRadius: 8, borderLeft: '2px solid var(--felt-line)' }}>
+              📝 {settings.sessionNotes}
+            </div>
+          )}
+
           {view === 'table' && rounds.length > 0 && (
             <div style={{ overflowX: 'auto' }}>
               <table className="history-table">
@@ -52,7 +58,11 @@ function Review({ t, settings, players, rounds, onEdit, onDelete, onClose }) {
                     const d = running[idx].deltas;
                     return (
                       <tr key={r.id}>
-                        <td>#{idx + 1}<br /><span style={{ color: 'var(--muted)', fontSize: 10 }}>{summarizeRound(r, players, t)}</span></td>
+                        <td>
+                          #{idx + 1}<br />
+                          <span style={{ color: 'var(--muted)', fontSize: 10 }}>{summarizeRound(r, players, t)}</span>
+                          {r.notes && <><br /><span style={{ color: 'var(--cream-dim)', fontSize: 10, fontStyle: 'italic' }}>"{r.notes}"</span></>}
+                        </td>
                         {d.map((v, i) => (
                           <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
                             {v > 0 ? '+' : ''}{v}

@@ -11,6 +11,10 @@ function ExportSheet({ t, settings, players, rounds, onClose }) {
     const lines = [];
     lines.push(`${t.appName} — ${N === 3 ? t.threePlayer : t.fourPlayer}`);
     lines.push(new Date().toLocaleString());
+    if (settings.sessionNotes) {
+      lines.push("");
+      lines.push(`📝 ${settings.sessionNotes}`);
+    }
     lines.push("");
     lines.push(t.players + ":");
     players.forEach((p, i) => lines.push(`  ${seatLabels[i]} · ${p}`));
@@ -23,6 +27,7 @@ function ExportSheet({ t, settings, players, rounds, onClose }) {
       lines.push(`#${idx + 1} ${sum}`);
       const parts = players.map((p, i) => `${p}: ${d[i] > 0 ? '+' : ''}${d[i]}`);
       lines.push("  " + parts.join("  "));
+      if (r.notes) lines.push(`  "${r.notes}"`);
     });
     lines.push("");
     lines.push(t.total + ":");
