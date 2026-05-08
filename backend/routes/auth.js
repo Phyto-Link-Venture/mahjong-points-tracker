@@ -5,7 +5,8 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { PrismaClient } = require('@prisma/client');
 const { body, validationResult } = require('express-validator');
-const nodemailer = require('nodemailer');
+let nodemailer;
+try { nodemailer = require('nodemailer'); } catch { nodemailer = null; }
 
 const prisma = new PrismaClient();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -27,7 +28,7 @@ function makeVerifyToken() {
 }
 
 async function sendVerifyEmail(email, name, token) {
-  if (!process.env.SMTP_HOST) return; // silently skip if not configured
+  if (!process.env.SMTP_HOST || !nodemailer) return; // silently skip if not configured
   try {
     const transport = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
