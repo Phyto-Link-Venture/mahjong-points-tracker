@@ -2,6 +2,7 @@
 const { useState: useStateA, useEffect: useEffectA, useCallback: useCallbackA } = React;
 
 const STORAGE_KEY = 'mahjong-tracker-v1';
+const LAST_SETTINGS_KEY = 'mahjong-last-settings-v1';
 const AUTH_KEY = 'mahjong-auth-v1';
 const API = '/api';
 
@@ -186,19 +187,21 @@ function App() {
   }
 
   function startSession(cfg) {
-    setSettings({
+    const newSettings = {
       mode: cfg.mode,
       playerColors: cfg.playerColors || MJ.PLAYER_COLORS.slice(0, cfg.mode),
       minFan: cfg.minFan, maxFan: cfg.maxFan,
       basePoint: cfg.basePoint,
       pairwiseLoser: cfg.pairwiseLoser,
-      discardShare: cfg.discardShare || 'standard',
+      discardShare: cfg.discardShare || 'shooter_solo',
       dealerHold: cfg.dealerHold || false,
       flowerPts: cfg.flowerPts, flyPts: cfg.flyPts,
       kongOpenPts: cfg.kongOpenPts, kongClosedPts: cfg.kongClosedPts,
       pointValue: cfg.pointValue || 0.10,
       startedAt: Date.now(),
-    });
+    };
+    try { localStorage.setItem(LAST_SETTINGS_KEY, JSON.stringify({ ...newSettings, names: cfg.names })); } catch {}
+    setSettings(newSettings);
     setPlayers(cfg.names);
     setRounds([]);
     setBackendSessionId(null);
@@ -291,7 +294,7 @@ function App() {
           </div>
         </div>
         <div className="content">
-          <Setup t={t} lang={lang} onStart={startSession} />
+          <Setup t={t} lang={lang} onStart={startSession} initial={(() => { try { const s = localStorage.getItem(LAST_SETTINGS_KEY); return s ? JSON.parse(s) : null; } catch { return null; } })()} />
           <div style={{ textAlign: 'center', paddingBottom: 8 }}>
             <button onClick={() => setShowJoin(true)}
               style={{ background: 'transparent', border: '1px solid var(--felt-line)', color: 'var(--muted)', borderRadius: 20, padding: '8px 20px', fontSize: 13, cursor: 'pointer' }}>

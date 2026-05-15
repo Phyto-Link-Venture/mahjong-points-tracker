@@ -30,7 +30,7 @@ function Setup({ t, lang, onStart, initial }) {
   const [maxFan, setMaxFan] = useState(initial?.maxFan ?? 10);
   const [basePoint, setBasePoint] = useState(initial?.basePoint ?? 1);
   const [pairwiseLoser, setPairwiseLoser] = useState(initial?.pairwiseLoser ?? true);
-  const [discardShare, setDiscardShare] = useState(initial?.discardShare ?? 'standard');
+  const [discardShare, setDiscardShare] = useState(initial?.discardShare ?? 'shooter_solo');
   const [flowerPts, setFlowerPts] = useState(initial?.flowerPts ?? 1);
   const [flyPts, setFlyPts] = useState(initial?.flyPts ?? 1);
   const [kongOpenPts, setKongOpenPts] = useState(initial?.kongOpenPts ?? 1);
