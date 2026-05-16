@@ -2,7 +2,7 @@ const router = require('express').Router();
 const requireAuth = require('../middleware/requireAuth');
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://mahjong-ollama:11434';
-const MODEL = process.env.OLLAMA_MODEL || 'gemma2:2b';
+const MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:1.5b';
 
 const SEAT_LABELS = {
   3: ['East', 'South', 'West'],
@@ -25,28 +25,34 @@ router.post('/parse-round', requireAuth, async (req, res) => {
     .map((_, i) => `{"playerIdx":${i},"flowers":0,"flies":0,"openKongs":0,"closedKongs":0}`)
     .join(',');
 
-  const prompt = `You are a mahjong score recorder. Extract round info from the transcript below.
+  const prompt = `You are a mahjong scorekeeper. Parse this voice transcript into structured data.
 
-Players (use their index number in JSON):
+Players:
 ${playerList}
 
 Transcript: "${transcript}"
 
-Instructions:
-- outcome: "self" = self-draw/tsumo/zimo/自摸, "discard" = discard/食/ron/oleh/buang
-- fan: integer 1–${mode === 3 ? 10 : 13}
-- discarderIdx: only set when outcome is "discard", otherwise null
-- For each player, count their bonuses mentioned: ${bonusNote}
-- "she/he/they" refers to the winner unless another name is mentioned
-- Extract bonuses for ALL players mentioned, not just the winner
-- Use null for fields you cannot determine
+Definitions:
+- "fan" or "fans" = the SCORE/POINTS of the winning hand (a number like 5, 8, 10). NOT a flower tile.
+- "flower" or "flowers" = flower bonus tiles (separate from fan score)
+- "open kong" / "明杠" = exposed kong bonus
+- "closed kong" / "暗杠" = concealed kong bonus
+- "fly" / "flies" / "苍蝇" = fly bonus (3-player only)
 
-Return ONLY valid JSON, no explanation or markdown:
+Extract:
+- winnerIdx: index of the winning player (null if unclear)
+- fan: the score in fan points, integer 1–${mode === 3 ? 10 : 13} (null if unclear)
+- outcome: "self" for self-draw/tsumo/zimo/自摸, "discard" for discard/食/ron/oleh (null if unclear)
+- discarderIdx: who discarded the winning tile, null unless outcome is "discard"
+- bonuses: flower/kong/fly counts for each player (default 0, set only what is explicitly mentioned)
+- "she"/"he" refers to the most recently named player
+
+Return ONLY this JSON, no extra text:
 {"winnerIdx":null,"fan":null,"outcome":null,"discarderIdx":null,"bonuses":[${defaultBonuses}]}`;
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
 
     const r = await fetch(`${OLLAMA_HOST}/api/generate`, {
       method: 'POST',

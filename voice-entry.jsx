@@ -154,7 +154,7 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
           body: JSON.stringify({ transcript: text, players, mode: settings.mode }),
-          signal: AbortSignal.timeout(100000),
+          signal: AbortSignal.timeout(65000),
         });
         if (r.ok) {
           const { parsed: aiParsed } = await r.json();
