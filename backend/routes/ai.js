@@ -25,26 +25,28 @@ router.post('/parse-round', requireAuth, async (req, res) => {
     .map((_, i) => `{"playerIdx":${i},"flowers":0,"flies":0,"openKongs":0,"closedKongs":0}`)
     .join(',');
 
-  const prompt = `You are a mahjong score recorder. Extract round information from a voice transcript.
+  const prompt = `You are a mahjong score recorder. Extract round info from the transcript below.
 
-Players:
+Players (use their index number in JSON):
 ${playerList}
 
 Transcript: "${transcript}"
 
-Rules:
-- outcome is "self" for self-draw/tsumo/zimo/自摸, "discard" for discard/食/ron/oleh
-- fan is a number (1 to ${mode === 3 ? 10 : 13})
-- discarderIdx only applies when outcome is "discard"
-- bonuses: ${bonusNote}
-- Use null for any field you are not confident about
+Instructions:
+- outcome: "self" = self-draw/tsumo/zimo/自摸, "discard" = discard/食/ron/oleh/buang
+- fan: integer 1–${mode === 3 ? 10 : 13}
+- discarderIdx: only set when outcome is "discard", otherwise null
+- For each player, count their bonuses mentioned: ${bonusNote}
+- "she/he/they" refers to the winner unless another name is mentioned
+- Extract bonuses for ALL players mentioned, not just the winner
+- Use null for fields you cannot determine
 
-Return ONLY a JSON object, no explanation:
+Return ONLY valid JSON, no explanation or markdown:
 {"winnerIdx":null,"fan":null,"outcome":null,"discarderIdx":null,"bonuses":[${defaultBonuses}]}`;
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), 90000);
 
     const r = await fetch(`${OLLAMA_HOST}/api/generate`, {
       method: 'POST',
