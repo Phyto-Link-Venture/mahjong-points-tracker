@@ -52,10 +52,12 @@ function getFanCategories(N, t) {
 
 function FanHelper({ t, settings, onUse, onClose, standalone }) {
   const [selected, setSelected] = useStateFH({});
+  const [manualMax, setManualMax] = useStateFH(false);
   const N = settings.mode;
   const categories = getFanCategories(N, t);
 
   const { total, isLimit } = useMemoFH(() => {
+    if (manualMax) return { total: settings.maxFan, isLimit: true };
     let sum = 0;
     let limit = false;
     for (const cat of categories) {
@@ -67,9 +69,10 @@ function FanHelper({ t, settings, onUse, onClose, standalone }) {
       }
     }
     return { total: limit ? settings.maxFan : sum, isLimit: limit };
-  }, [selected, settings.maxFan]);
+  }, [selected, manualMax, settings.maxFan]);
 
   function toggle(key) {
+    setManualMax(false);
     setSelected(prev => ({ ...prev, [key]: !prev[key] }));
   }
 
@@ -83,20 +86,40 @@ function FanHelper({ t, settings, onUse, onClose, standalone }) {
         <div className="sheet-body">
 
           {/* Running total */}
-          <div style={{ textAlign: 'center', marginBottom: 18, padding: '14px 12px', background: 'var(--felt-2)', borderRadius: 12 }}>
-            <div style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t.fanCount}</div>
-            <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: isLimit ? 'var(--gold)' : 'var(--cream)', fontFamily: 'JetBrains Mono, monospace' }}>
-              {total}
+          <div style={{ marginBottom: 18, padding: '14px 12px', background: 'var(--felt-2)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t.fanCount}</div>
+              <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: isLimit ? 'var(--red)' : 'var(--cream)', fontFamily: 'JetBrains Mono, monospace' }}>
+                {isLimit ? '爆' : total}
+              </div>
+              {isLimit && (
+                <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 6, fontWeight: 600 }}>{settings.maxFan} {t.fanShort} · {t.limitHandNote.split('·')[0].trim()}</div>
+              )}
+              {!isLimit && total > 0 && total < settings.minFan && (
+                <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 4 }}>{t.minFanWarn}</div>
+              )}
+              {!isLimit && total >= settings.minFan && total > 0 && (
+                <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>min {settings.minFan} · max {settings.maxFan}</div>
+              )}
             </div>
-            {isLimit && (
-              <div style={{ color: 'var(--gold)', fontSize: 11, marginTop: 6, fontWeight: 600 }}>{t.limitHandNote.split('·')[0].trim()}</div>
-            )}
-            {!isLimit && total > 0 && total < settings.minFan && (
-              <div style={{ color: 'var(--red)', fontSize: 11, marginTop: 4 }}>{t.minFanWarn}</div>
-            )}
-            {!isLimit && total >= settings.minFan && total > 0 && (
-              <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 4 }}>min {settings.minFan} · max {settings.maxFan}</div>
-            )}
+            <button
+              onClick={() => setManualMax(m => !m)}
+              style={{
+                background: manualMax ? 'var(--red)' : 'var(--red-dim)',
+                border: '1px solid var(--red)',
+                color: 'white',
+                borderRadius: 10,
+                padding: '10px 14px',
+                cursor: 'pointer',
+                fontSize: 20,
+                fontWeight: 700,
+                lineHeight: 1,
+                flexShrink: 0,
+                opacity: manualMax ? 1 : 0.7,
+              }}
+            >
+              爆
+            </button>
           </div>
 
           {categories.map(cat => (

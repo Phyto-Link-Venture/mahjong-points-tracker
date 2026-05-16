@@ -164,15 +164,27 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
                   {t.fhTitle} ↗
                 </button>
               </div>
-              <div className="fan-stepper">
-                <div className="fan-pill">
-                  <button onClick={() => setFan(Math.max(0, Number(fan) - 1))}>−</button>
-                  <span className="val">{fan}</span>
-                  <button onClick={() => setFan(Number(fan) + 1)}>+</button>
-                </div>
-                {fan < settings.minFan && <span className="fan-warn">{t.minFanWarn}</span>}
-                {fan > settings.maxFan && <span className="fan-warn cap">{t.capped} {settings.maxFan}</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <input
+                  type="range"
+                  className="fan-slider"
+                  min={0}
+                  max={settings.maxFan}
+                  value={Math.min(Number(fan), settings.maxFan)}
+                  onChange={e => setFan(Number(e.target.value))}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 20, minWidth: 36, textAlign: 'center', color: Number(fan) >= settings.maxFan ? 'var(--red)' : 'var(--gold)' }}>
+                  {Number(fan) >= settings.maxFan ? '爆' : fan}
+                </span>
+                <button
+                  onClick={() => setFan(settings.maxFan)}
+                  style={{ background: Number(fan) >= settings.maxFan ? 'var(--red)' : 'var(--red-dim)', border: '1px solid var(--red)', color: 'white', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 14, fontWeight: 700, flexShrink: 0 }}
+                >
+                  爆
+                </button>
               </div>
+              {Number(fan) > 0 && Number(fan) < settings.minFan && <span className="fan-warn">{t.minFanWarn}</span>}
               {settings.pairwiseLoser && (
                 <div style={{ marginTop: 12 }}>
                   <div className="hint" style={{ color: 'var(--muted)', fontSize: 11, marginBottom: 6 }}>
