@@ -26,6 +26,20 @@
   <!-- Google Identity Services (for Google Sign-In) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
+  <!-- Whisper AI (local speech-to-text) — loaded as module, exposed to window -->
+  <script type="module">
+    try {
+      const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+      env.allowLocalModels = false;
+      env.useBrowserCache = true;
+      window.XenovaTransformers = { pipeline, env };
+    } catch (e) {
+      console.warn('[voice] transformers.js failed to load:', e);
+    } finally {
+      document.dispatchEvent(new CustomEvent('xenova-ready'));
+    }
+  </script>
+
   <!-- QR code generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==" crossorigin="anonymous"></script>
   <script src="config.js"></script>
@@ -43,6 +57,7 @@
   <script type="text/babel" src="settlement.jsx"></script>
   <script type="text/babel" src="chart.jsx"></script>
   <script type="text/babel" src="summary.jsx"></script>
+  <script type="text/babel" src="voice-entry.jsx"></script>
   <script type="text/babel" src="app.jsx"></script>
 
   <script>

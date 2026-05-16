@@ -55,6 +55,8 @@ function App() {
   const [showJoin, setShowJoin] = useStateA(false);
   const [showSummary, setShowSummary] = useStateA(false);
   const [showFeedback, setShowFeedback] = useStateA(false);
+  const [showVoice, setShowVoice] = useStateA(false);
+  const [voicePrefill, setVoicePrefill] = useStateA(null);
   const [undoBuffer, setUndoBuffer] = useStateA(null); // { round, timer }
   const autoSyncTimer = React.useRef(null);
 
@@ -244,7 +246,7 @@ function App() {
       const timer = setTimeout(() => setUndoBuffer(null), 4000);
       setUndoBuffer({ round: stamped, timer });
     }
-    setShowEntry(false); setEditingIdx(null);
+    setShowEntry(false); setEditingIdx(null); setVoicePrefill(null);
   }
 
   function undoLastRound() {
@@ -400,7 +402,8 @@ function App() {
 
       <div className="bottomnav">
         <button className="nav-icon" title={t.review} onClick={() => setShowReview(true)}>☰</button>
-        <button className="fab" onClick={() => { setEditingIdx(null); setShowEntry(true); }}>
+        <button className="nav-icon" title="Voice round" onClick={() => setShowVoice(true)} style={{ fontSize: 18 }}>🎙</button>
+        <button className="fab" onClick={() => { setVoicePrefill(null); setEditingIdx(null); setShowEntry(true); }}>
           + {t.recordRound}
         </button>
         <button className="nav-icon" title={t.fanCounterBtn} onClick={() => setShowFanCounter(true)} style={{ fontSize: 14, fontFamily: 'var(--serif)' }}>番</button>
@@ -412,10 +415,10 @@ function App() {
         <RoundEntry
           t={t} settings={settings} players={players}
           dealerIdx={editingIdx != null ? MJ.computeDealerIdx(rounds, settings, editingIdx) : dealerIdx}
-          initial={editingRound}
+          initial={editingIdx != null ? editingRound : voicePrefill}
           simpleMode={!!tweaks.simpleMode}
           onSave={saveRound}
-          onCancel={() => { setShowEntry(false); setEditingIdx(null); }}
+          onCancel={() => { setShowEntry(false); setEditingIdx(null); setVoicePrefill(null); }}
         />
       )}
       {showReview && (
@@ -460,6 +463,13 @@ function App() {
         <StatsView t={t} authToken={authToken} onClose={() => setShowStats(false)} />
       )}
       {showFeedback && <FeedbackSheet t={t} authToken={authToken} onClose={() => setShowFeedback(false)} />}
+      {showVoice && (
+        <VoiceEntry
+          t={t} settings={settings} players={players} dealerIdx={dealerIdx}
+          onParsed={(data) => { setVoicePrefill(data); setShowVoice(false); setEditingIdx(null); setShowEntry(true); }}
+          onClose={() => setShowVoice(false)}
+        />
+      )}
       {confirm && (
         <div className="sheet-backdrop" style={{ alignItems: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setConfirm(null); }}>
           <div className="confirm">
