@@ -466,6 +466,7 @@ function App() {
       {showVoice && (
         <VoiceEntry
           t={t} settings={settings} players={players} dealerIdx={dealerIdx}
+          authToken={authToken}
           onParsed={(data) => { setVoicePrefill(data); setShowVoice(false); setEditingIdx(null); setShowEntry(true); }}
           onClose={() => setShowVoice(false)}
         />
