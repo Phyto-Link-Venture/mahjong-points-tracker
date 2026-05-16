@@ -25,30 +25,25 @@ router.post('/parse-round', requireAuth, async (req, res) => {
     .map((_, i) => `{"playerIdx":${i},"flowers":0,"flies":0,"openKongs":0,"closedKongs":0}`)
     .join(',');
 
-  const prompt = `You are a mahjong scorekeeper. Parse this voice transcript into structured data.
+  const examplePlayers = mode === 3
+    ? '0=Tom, 1=Sam, 2=Mei'
+    : '0=Tom, 1=Sam, 2=Mei, 3=Jin';
+  const exampleBonuses = mode === 3
+    ? '[{"playerIdx":0,"flowers":1,"flies":0,"openKongs":0,"closedKongs":0},{"playerIdx":1,"flowers":0,"flies":0,"openKongs":2,"closedKongs":0},{"playerIdx":2,"flowers":0,"flies":0,"openKongs":0,"closedKongs":0}]'
+    : '[{"playerIdx":0,"flowers":1,"flies":0,"openKongs":0,"closedKongs":0},{"playerIdx":1,"flowers":0,"flies":0,"openKongs":2,"closedKongs":0},{"playerIdx":2,"flowers":0,"flies":0,"openKongs":0,"closedKongs":0},{"playerIdx":3,"flowers":0,"flies":0,"openKongs":0,"closedKongs":0}]';
 
-Players:
-${playerList}
+  const prompt = `Extract mahjong round data from a voice transcript and return only JSON.
 
-Transcript: "${transcript}"
+"fan"/"fans" = winning hand score (integer). "flower"/"flowers" = bonus flower tile count (separate from fan).
+outcome: "self"=self-draw/tsumo/zimo/自摸, "discard"=discard/ron/oleh/食
 
-Definitions:
-- "fan" or "fans" = the SCORE/POINTS of the winning hand (a number like 5, 8, 10). NOT a flower tile.
-- "flower" or "flowers" = flower bonus tiles (separate from fan score)
-- "open kong" / "明杠" = exposed kong bonus
-- "closed kong" / "暗杠" = concealed kong bonus
-- "fly" / "flies" / "苍蝇" = fly bonus (3-player only)
+Example players: ${examplePlayers}
+Example transcript: "Sam won 6 fans discard by Tom, Sam has 1 flower, Tom has 2 open kongs"
+Example answer: {"winnerIdx":1,"fan":6,"outcome":"discard","discarderIdx":0,"bonuses":${exampleBonuses}}
 
-Extract:
-- winnerIdx: index of the winning player (null if unclear)
-- fan: the score in fan points, integer 1–${mode === 3 ? 10 : 13} (null if unclear)
-- outcome: "self" for self-draw/tsumo/zimo/自摸, "discard" for discard/食/ron/oleh (null if unclear)
-- discarderIdx: who discarded the winning tile, null unless outcome is "discard"
-- bonuses: flower/kong/fly counts for each player (default 0, set only what is explicitly mentioned)
-- "she"/"he" refers to the most recently named player
-
-Return ONLY this JSON, no extra text:
-{"winnerIdx":null,"fan":null,"outcome":null,"discarderIdx":null,"bonuses":[${defaultBonuses}]}`;
+Actual players: ${players.map((p, i) => `${i}=${p}`).join(', ')}
+Actual transcript: "${transcript}"
+Actual answer:`;
 
   try {
     const controller = new AbortController();
