@@ -28,6 +28,7 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
   const [notes, setNotes] = useStateRE(initial?.notes || "");
   const [simplePays, setSimplePays] = useStateRE(initial?.simple?.winnerPays || {});
   const [showFanHelper, setShowFanHelper] = useStateRE(false);
+  const [openLoserPicker, setOpenLoserPicker] = useStateRE(null);
 
   const seatLabels = N === 3 ? [t.east, t.south, t.west] : [t.east, t.south, t.west, t.north];
 
@@ -196,17 +197,49 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
                       if (i === winnerIdx) return null;
                       const lf = loserFans[i] || 0;
                       const tooLow = lf > 0 && lf < settings.minFan;
+                      const isOpen = openLoserPicker === i;
                       return (
-                        <div key={i} className="field-row">
-                          <div className="label">
-                            {p} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({seatLabels[i]})</span>
-                            {tooLow && <span style={{ color: 'var(--red)', fontSize: 10, marginLeft: 6 }}>· {t.minFanWarn}</span>}
+                        <div key={i} style={{ marginBottom: 6 }}>
+                          <div
+                            className="field-row loser-fan-row"
+                            onClick={() => setOpenLoserPicker(isOpen ? null : i)}
+                            style={{ cursor: 'pointer', userSelect: 'none' }}
+                          >
+                            <div className="label">
+                              {p} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({seatLabels[i]})</span>
+                              {tooLow && <span style={{ color: 'var(--red)', fontSize: 10, marginLeft: 6 }}>· {t.minFanWarn}</span>}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{
+                                fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 16,
+                                color: lf >= settings.maxFan ? 'var(--red)' : lf > 0 ? 'var(--gold)' : 'var(--muted)',
+                                minWidth: 28, textAlign: 'center',
+                              }}>
+                                {lf >= settings.maxFan ? '爆' : lf > 0 ? lf : '—'}
+                              </span>
+                              <span style={{ color: 'var(--muted)', fontSize: 12 }}>{isOpen ? '▴' : '▾'}</span>
+                            </div>
                           </div>
-                          <div className="fan-pill">
-                            <button onClick={() => setLoserFans({ ...loserFans, [i]: Math.max(0, (loserFans[i] || 0) - 1) })}>−</button>
-                            <span className="val">{lf}</span>
-                            <button onClick={() => setLoserFans({ ...loserFans, [i]: (loserFans[i] || 0) + 1 })}>+</button>
-                          </div>
+                          {isOpen && (
+                            <div className="fan-btn-grid" style={{ marginTop: 6, marginBottom: 2 }}>
+                              <button
+                                className={"fan-btn " + (lf === 0 ? "active" : "")}
+                                style={{ color: lf === 0 ? 'var(--gold)' : 'var(--muted)', fontSize: 13 }}
+                                onClick={() => { setLoserFans({ ...loserFans, [i]: 0 }); setOpenLoserPicker(null); }}
+                              >—</button>
+                              {Array.from({ length: settings.maxFan - settings.minFan }, (_, k) => k + settings.minFan).map(v => (
+                                <button
+                                  key={v}
+                                  className={"fan-btn " + (lf === v ? "active" : "")}
+                                  onClick={() => { setLoserFans({ ...loserFans, [i]: v }); setOpenLoserPicker(null); }}
+                                >{v}</button>
+                              ))}
+                              <button
+                                className={"fan-btn fan-btn-bao " + (lf >= settings.maxFan ? "active" : "")}
+                                onClick={() => { setLoserFans({ ...loserFans, [i]: settings.maxFan }); setOpenLoserPicker(null); }}
+                              >爆</button>
+                            </div>
+                          )}
                         </div>
                       );
                     })

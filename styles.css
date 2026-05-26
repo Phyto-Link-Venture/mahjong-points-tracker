@@ -689,6 +689,7 @@ input:focus { border-color: var(--gold); }
 }
 
 /* Fan slider */
+.loser-fan-row:hover { background: rgba(255,255,255,0.03); border-radius: 6px; }
 .fan-btn-grid {
   display: flex;
   flex-wrap: wrap;
