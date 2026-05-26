@@ -164,22 +164,19 @@ function RoundEntry({ t, settings, players, dealerIdx, initial, onSave, onCancel
                   {t.fhTitle} ↗
                 </button>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <input
-                  type="range"
-                  className="fan-slider"
-                  min={0}
-                  max={settings.maxFan}
-                  value={Math.min(Number(fan), settings.maxFan)}
-                  onChange={e => setFan(Number(e.target.value))}
-                  style={{ flex: 1 }}
-                />
-                <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 20, minWidth: 36, textAlign: 'center', color: Number(fan) >= settings.maxFan ? 'var(--red)' : 'var(--gold)' }}>
-                  {Number(fan) >= settings.maxFan ? '爆' : fan}
-                </span>
+              <div className="fan-btn-grid">
+                {Array.from({ length: settings.maxFan - settings.minFan }, (_, i) => i + settings.minFan).map(v => (
+                  <button
+                    key={v}
+                    className={"fan-btn " + (Number(fan) === v ? "active" : "")}
+                    onClick={() => setFan(v)}
+                  >
+                    {v}
+                  </button>
+                ))}
                 <button
+                  className={"fan-btn fan-btn-bao " + (Number(fan) >= settings.maxFan ? "active" : "")}
                   onClick={() => setFan(settings.maxFan)}
-                  style={{ background: Number(fan) >= settings.maxFan ? 'var(--red)' : 'var(--red-dim)', border: '1px solid var(--red)', color: 'white', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 14, fontWeight: 700, flexShrink: 0 }}
                 >
                   爆
                 </button>

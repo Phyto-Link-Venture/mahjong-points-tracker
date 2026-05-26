@@ -689,34 +689,41 @@ input:focus { border-color: var(--gold); }
 }
 
 /* Fan slider */
-.fan-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--felt-line);
-  outline: none;
-  cursor: pointer;
+.fan-btn-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
 }
-.fan-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--gold);
+.fan-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1.5px solid var(--felt-line);
+  background: var(--felt-2);
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  border: 2px solid var(--felt-1);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.fan-slider::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--gold);
-  cursor: pointer;
-  border: 2px solid var(--felt-1);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+.fan-btn:hover { background: var(--felt-3); border-color: var(--gold); }
+.fan-btn.active {
+  background: rgba(212,175,55,0.22);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.fan-btn-bao {
+  border-color: var(--red);
+  color: var(--red);
+}
+.fan-btn-bao:hover { background: var(--red-dim); border-color: var(--red); }
+.fan-btn-bao.active {
+  background: var(--red-dim);
+  border-color: var(--red);
+  color: white;
 }
 
 /* Bonus grid */
