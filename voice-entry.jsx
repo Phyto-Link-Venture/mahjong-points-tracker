@@ -15,18 +15,19 @@ function parseRoundFallback(text, players, settings) {
     if (lower.includes(name)) { winnerIdx = i; break; }
   }
 
-  const wordNums = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13 };
+  const wordNums = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,
+    一:1,两:2,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,十一:11,十二:12,十三:13 };
   let fan = null;
-  const fanMatch = lower.match(/(\d+)\s*fan/);
+  const fanMatch = lower.match(/(\d+)\s*(?:fan|番|翻)/);
   if (fanMatch) fan = parseInt(fanMatch[1]);
-  if (!fan) for (const [w, n] of Object.entries(wordNums)) { if (new RegExp('\\b' + w + '\\b').test(lower)) { fan = n; break; } }
+  if (!fan) for (const [w, n] of Object.entries(wordNums)) { if (lower.includes(w)) { fan = n; break; } }
   if (!fan) { const m = lower.match(/\b(1[0-3]|[1-9])\b/); if (m) fan = parseInt(m[1]); }
   if (!fan) fan = settings.minFan;
   fan = Math.min(fan, settings.maxFan);
 
   let outcome = 'self';
   if (/self.?draw|tsumo|zi.?mo|自摸|zimo/.test(lower)) outcome = 'self';
-  else if (/discard|食糊|ron|buang|oleh/.test(lower)) outcome = 'discard';
+  else if (/discard|食糊|ron|buang|oleh|打出|放炮/.test(lower)) outcome = 'discard';
 
   let discarderIdx = null;
   if (outcome === 'discard') {
@@ -47,6 +48,13 @@ function toRoundEntryBonuses(aiBonuses, N) {
   });
 }
 
+const VOICE_LANG_KEY = 'mahjong-voice-lang';
+const LANG_OPTIONS = [
+  { code: 'zh-CN', label: '中文' },
+  { code: 'en-US', label: 'English' },
+  { code: 'ms-MY', label: 'Melayu' },
+];
+
 function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onClose }) {
   const [phase, setPhase] = useStateVE('idle'); // idle|recording|parsing|review
   const [transcript, setTranscript] = useStateVE('');
@@ -55,6 +63,12 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
   const [aiUsed, setAiUsed] = useStateVE(false);
   const [errMsg, setErrMsg] = useStateVE(null);
   const [seconds, setSeconds] = useStateVE(0);
+  const [lang, setLangState] = useStateVE(() => localStorage.getItem(VOICE_LANG_KEY) || 'zh-CN');
+
+  function setLang(l) {
+    localStorage.setItem(VOICE_LANG_KEY, l);
+    setLangState(l);
+  }
 
   const recogRef = useRefVE(null);
   const timerRef = useRefVE(null);
@@ -84,7 +98,7 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
     finalTextRef.current = '';
 
     const recognition = new SpeechRecognition();
-    recognition.lang = navigator.language || 'en';
+    recognition.lang = lang;
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
@@ -202,12 +216,33 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
           {/* Idle */}
           {phase === 'idle' && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
+              {/* Language selector */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 18 }}>
+                {LANG_OPTIONS.map(l => (
+                  <button
+                    key={l.code}
+                    onClick={() => setLang(l.code)}
+                    style={{
+                      padding: '5px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
+                      background: lang === l.code ? 'var(--gold)' : 'var(--felt-2)',
+                      color: lang === l.code ? 'var(--felt-1)' : 'var(--muted)',
+                      border: '1px solid ' + (lang === l.code ? 'var(--gold)' : 'var(--felt-line)'),
+                      fontWeight: lang === l.code ? 700 : 400,
+                    }}
+                  >{l.label}</button>
+                ))}
+              </div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6, lineHeight: 1.7 }}>
-                Say who won, fans, outcome, and any bonuses.
+                {lang === 'zh-CN'
+                  ? '说出赢家、番数和结果'
+                  : lang === 'ms-MY'
+                  ? 'Sebut pemenang, fan, dan hasilnya'
+                  : 'Say who won, fans, and outcome'}
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 28, opacity: 0.65, lineHeight: 1.7 }}>
-                "Alice won 8 fans self draw, 2 flowers"<br />
-                "Bob menang 5 fan, discard oleh Carol"
+                {lang === 'zh-CN'
+                  ? <>「Alice赢了8番自摸」<br />「Bob赢了5番，Carol打出」</>
+                  : <>「Alice won 8 fans self draw」<br />「Bob wins 5 fans, discard by Carol」</>}
               </div>
               <button
                 className="voice-mic-btn"
@@ -215,7 +250,7 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
                 disabled={!supported}
               >🎙</button>
               <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>
-                {supported ? 'Tap to record' : 'Use Chrome or Edge'}
+                {supported ? (lang === 'zh-CN' ? '点击录音' : 'Tap to record') : 'Use Chrome or Edge'}
               </div>
               {authToken && (
                 <div style={{ marginTop: 10, fontSize: 11, color: 'var(--gold)', opacity: 0.8 }}>✦ AI parsing active</div>
