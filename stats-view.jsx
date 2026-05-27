@@ -227,6 +227,33 @@ function StatsTab({ t, authToken }) {
   );
 }
 
+// ── Per-session stats helper ─────────────────────────────────────────────────
+
+function computeSessionStats(rounds, players, settings) {
+  const maxFan = settings?.maxFan ?? 10;
+  const totals = MJ.computeTotals(rounds, settings);
+  const decided = rounds.filter(r => r.outcome === 'self' || r.outcome === 'discard');
+
+  return players.map((name, i) => {
+    const wins = decided.filter(r => r.winnerIdx === i);
+    const selfDrawWins = wins.filter(r => r.outcome === 'self').length;
+    const discardWins  = wins.filter(r => r.outcome === 'discard').length;
+    const limitHands   = wins.filter(r => (r.fan || 0) >= maxFan).length;
+    const totalFan     = wins.reduce((acc, r) => acc + (r.fan || 0), 0);
+    return {
+      name,
+      finalScore:  totals[i],
+      wins:        wins.length,
+      decidedRounds: decided.length,
+      winRate:     decided.length > 0 ? Math.round(wins.length / decided.length * 100) : 0,
+      avgFan:      wins.length > 0 ? (totalFan / wins.length).toFixed(1) : '—',
+      selfDrawWins,
+      discardWins,
+      limitHands,
+    };
+  }).sort((a, b) => b.finalScore - a.finalScore);
+}
+
 // ── History Tab ─────────────────────────────────────────────────────────────
 
 function HistoryTab({ t, authToken }) {
@@ -312,43 +339,103 @@ function HistoryTab({ t, authToken }) {
               </button>
             </div>
 
-            {/* Expanded score table */}
-            {isExpanded && rounds.length > 0 && settings.mode && (
-              <div style={{ borderTop: '1px solid var(--felt-line)', padding: '0 0 14px', overflowX: 'auto' }}>
-                <table className="history-table" style={{ margin: '12px 14px 0', width: 'calc(100% - 28px)' }}>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      {players.map((p, i) => <th key={i}>{p}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rounds.map((r, idx) => {
-                      const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
-                      const d = MJ.computeDeltas(r, settings, dIdx);
-                      return (
-                        <tr key={idx}>
-                          <td>{idx + 1}</td>
-                          {d.map((v, i) => (
-                            <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
-                              {v > 0 ? '+' : ''}{v}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                    <tr className="totals">
-                      <td>{t.total}</td>
-                      {MJ.computeTotals(rounds, settings).map((v, i) => (
-                        <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
-                          {v > 0 ? '+' : ''}{v}
-                        </td>
+            {/* Expanded score table + analysis */}
+            {isExpanded && rounds.length > 0 && settings.mode && (() => {
+              const sessionStats = computeSessionStats(rounds, players, settings);
+              return (
+                <div style={{ borderTop: '1px solid var(--felt-line)', padding: '0 0 14px', overflowX: 'auto' }}>
+                  <table className="history-table" style={{ margin: '12px 14px 0', width: 'calc(100% - 28px)' }}>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        {players.map((p, i) => <th key={i}>{p}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rounds.map((r, idx) => {
+                        const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
+                        const d = MJ.computeDeltas(r, settings, dIdx);
+                        return (
+                          <tr key={idx}>
+                            <td>{idx + 1}</td>
+                            {d.map((v, i) => (
+                              <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
+                                {v > 0 ? '+' : ''}{v}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                      <tr className="totals">
+                        <td>{t.total}</td>
+                        {MJ.computeTotals(rounds, settings).map((v, i) => (
+                          <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
+                            {v > 0 ? '+' : ''}{v}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  {/* Per-session player analysis */}
+                  <div style={{ margin: '16px 14px 0' }}>
+                    <div className="section-title" style={{ marginBottom: 10, fontSize: 11, letterSpacing: '0.08em' }}>SESSION ANALYSIS</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {sessionStats.map((s, rank) => (
+                        <div key={s.name} style={{ background: 'var(--felt-3)', borderRadius: 10, padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{
+                                width: 22, height: 22, borderRadius: '50%', fontSize: 10, fontWeight: 700,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: rank === 0 ? 'var(--gold)' : 'rgba(255,255,255,0.08)',
+                                color: rank === 0 ? 'var(--felt-1)' : 'var(--muted)',
+                              }}>#{rank + 1}</div>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--cream)' }}>{s.name}</span>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{
+                                fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 18,
+                                color: s.finalScore > 0 ? 'var(--green-pos)' : s.finalScore < 0 ? 'var(--red)' : 'var(--muted)',
+                              }}>
+                                {s.finalScore > 0 ? '+' : ''}{s.finalScore}
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
+                            {[
+                              { label: t.statsWinRate, value: s.winRate + '%' },
+                              { label: t.statsWins,    value: s.wins },
+                              { label: t.statsAvgFan,  value: s.avgFan },
+                              { label: t.statsLimit,   value: s.limitHands },
+                            ].map(cell => (
+                              <div key={cell.label} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: '5px 6px', textAlign: 'center' }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--cream)', fontFamily: 'var(--mono)' }}>{cell.value}</div>
+                                <div style={{ fontSize: 9, color: 'var(--muted)', marginTop: 1 }}>{cell.label}</div>
+                              </div>
+                            ))}
+                          </div>
+                          {(s.selfDrawWins > 0 || s.discardWins > 0) && (
+                            <div style={{ display: 'flex', gap: 5, marginTop: 7 }}>
+                              {s.selfDrawWins > 0 && (
+                                <span style={{ fontSize: 10, background: 'rgba(212,175,55,0.15)', color: 'var(--gold)', padding: '2px 8px', borderRadius: 10 }}>
+                                  {t.selfDraw.split(' ')[0]} ×{s.selfDrawWins}
+                                </span>
+                              )}
+                              {s.discardWins > 0 && (
+                                <span style={{ fontSize: 10, background: 'rgba(255,255,255,0.05)', color: 'var(--muted)', padding: '2px 8px', borderRadius: 10 }}>
+                                  {t.discard.split(' ')[0]} ×{s.discardWins}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         );
       })}

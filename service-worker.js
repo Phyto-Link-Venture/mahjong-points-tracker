@@ -1,4 +1,4 @@
-const CACHE = 'mahjong-v10';
+const CACHE = 'mahjong-v11';
 const STATIC = [
   '/', '/index.html', '/styles.css', '/manifest.json',
   '/icon-192.png', '/icon-512.png',
