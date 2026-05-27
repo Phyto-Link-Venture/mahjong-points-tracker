@@ -344,39 +344,6 @@ function HistoryTab({ t, authToken }) {
               const sessionStats = computeSessionStats(rounds, players, settings);
               return (
                 <div style={{ borderTop: '1px solid var(--felt-line)', padding: '0 0 14px', overflowX: 'auto' }}>
-                  <table className="history-table" style={{ margin: '12px 14px 0', width: 'calc(100% - 28px)' }}>
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        {players.map((p, i) => <th key={i}>{p}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rounds.map((r, idx) => {
-                        const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
-                        const d = MJ.computeDeltas(r, settings, dIdx);
-                        return (
-                          <tr key={idx}>
-                            <td>{idx + 1}</td>
-                            {d.map((v, i) => (
-                              <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
-                                {v > 0 ? '+' : ''}{v}
-                              </td>
-                            ))}
-                          </tr>
-                        );
-                      })}
-                      <tr className="totals">
-                        <td>{t.total}</td>
-                        {MJ.computeTotals(rounds, settings).map((v, i) => (
-                          <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
-                            {v > 0 ? '+' : ''}{v}
-                          </td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-
                   {/* Per-session player analysis */}
                   <div style={{ margin: '16px 14px 0' }}>
                     <div className="section-title" style={{ marginBottom: 10, fontSize: 11, letterSpacing: '0.08em' }}>SESSION ANALYSIS</div>
@@ -433,6 +400,40 @@ function HistoryTab({ t, authToken }) {
                       ))}
                     </div>
                   </div>
+
+                  <table className="history-table" style={{ margin: '12px 14px 0', width: 'calc(100% - 28px)' }}>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        {players.map((p, i) => <th key={i}>{p}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rounds.map((r, idx) => {
+                        const dIdx = MJ.computeDealerIdx(rounds, settings, idx);
+                        const d = MJ.computeDeltas(r, settings, dIdx);
+                        return (
+                          <tr key={idx}>
+                            <td>{idx + 1}</td>
+                            {d.map((v, i) => (
+                              <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
+                                {v > 0 ? '+' : ''}{v}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                      <tr className="totals">
+                        <td>{t.total}</td>
+                        {MJ.computeTotals(rounds, settings).map((v, i) => (
+                          <td key={i} className={v > 0 ? 'delta-pos' : v < 0 ? 'delta-neg' : 'delta-zero'}>
+                            {v > 0 ? '+' : ''}{v}
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+
                 </div>
               );
             })()}
