@@ -1,4 +1,6 @@
-const CACHE = 'mahjong-v13';
+const CACHE = 'mahjong-v14';
+// CDN hosts that serve Whisper model files — let them manage their own cache
+const BYPASS_HOSTS = ['cdn.jsdelivr.net', 'huggingface.co'];
 const STATIC = [
   '/', '/index.html', '/styles.css', '/manifest.json',
   '/icon-192.png', '/icon-512.png',
@@ -27,6 +29,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  if (BYPASS_HOSTS.includes(url.hostname)) return;
   // Network-first for API calls
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(fetch(e.request).catch(() => new Response('{"error":"offline"}', { headers: { 'Content-Type': 'application/json' } })));

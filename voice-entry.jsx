@@ -1,45 +1,15 @@
-// Voice round entry — Web Speech API (browser STT) + Ollama server for structured parsing
+// Voice round entry — Whisper (local STT) + Ollama (AI parse) + editable transcript
 const { useState: useStateVE, useEffect: useEffectVE, useRef: useRefVE } = React;
 
 const API = '/api';
+const WHISPER_MODEL = 'onnx-community/whisper-tiny';
+const VOICE_LANG_KEY = 'mahjong-voice-lang';
 
-function parseRoundFallback(text, players, settings) {
-  const lower = text.toLowerCase().replace(/[.,!?。，！？]/g, ' ');
-  const sorted = players
-    .map((p, i) => ({ name: p.toLowerCase().trim(), i }))
-    .filter(x => x.name.length >= 2)
-    .sort((a, b) => b.name.length - a.name.length);
-
-  let winnerIdx = null;
-  for (const { name, i } of sorted) {
-    if (lower.includes(name)) { winnerIdx = i; break; }
-  }
-
-  const wordNums = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,
-    一:1,两:2,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,十一:11,十二:12,十三:13 };
-  let fan = null;
-  const fanMatch = lower.match(/(\d+)\s*(?:fan|番|翻)/);
-  if (fanMatch) fan = parseInt(fanMatch[1]);
-  if (!fan) for (const [w, n] of Object.entries(wordNums)) { if (lower.includes(w)) { fan = n; break; } }
-  if (!fan) { const m = lower.match(/\b(1[0-3]|[1-9])\b/); if (m) fan = parseInt(m[1]); }
-  if (!fan) fan = settings.minFan;
-  fan = Math.min(fan, settings.maxFan);
-
-  let outcome = 'self';
-  if (/self.?draw|tsumo|zi.?mo|自摸|zimo/.test(lower)) outcome = 'self';
-  else if (/discard|食糊|ron|buang|oleh|打出|放炮/.test(lower)) outcome = 'discard';
-
-  let discarderIdx = null;
-  if (outcome === 'discard') {
-    for (const { name, i } of sorted) {
-      if (i !== winnerIdx && lower.includes(name)) { discarderIdx = i; break; }
-    }
-  }
-
-  const N = settings.mode;
-  const bonuses = Array(N).fill(null).map((_, i) => ({ playerIdx: i, flowers: 0, flies: 0, openKongs: 0, closedKongs: 0 }));
-  return { winnerIdx, fan, outcome, discarderIdx, bonuses };
-}
+const LANG_OPTIONS = [
+  { code: 'zh-CN', whisper: 'chinese', label: '中文' },
+  { code: 'en-US', whisper: 'english', label: 'English' },
+  { code: 'ms-MY', whisper: 'malay',   label: 'Melayu' },
+];
 
 function toRoundEntryBonuses(aiBonuses, N) {
   return Array(N).fill(null).map((_, i) => {
@@ -48,155 +18,169 @@ function toRoundEntryBonuses(aiBonuses, N) {
   });
 }
 
-const VOICE_LANG_KEY = 'mahjong-voice-lang';
-const LANG_OPTIONS = [
-  { code: 'zh-CN', label: '中文' },
-  { code: 'en-US', label: 'English' },
-  { code: 'ms-MY', label: 'Melayu' },
-];
+function waitForHF() {
+  return new Promise((resolve, reject) => {
+    if (window.HFTransformers) { resolve(window.HFTransformers); return; }
+    const onReady = () => {
+      document.removeEventListener('hf-ready', onReady);
+      if (window.HFTransformers) resolve(window.HFTransformers);
+      else reject(new Error('transformers.js failed to load'));
+    };
+    document.addEventListener('hf-ready', onReady);
+    setTimeout(() => {
+      document.removeEventListener('hf-ready', onReady);
+      reject(new Error('Timeout waiting for transformers.js'));
+    }, 30000);
+  });
+}
 
 function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onClose }) {
-  const [phase, setPhase] = useStateVE('idle'); // idle|recording|parsing|review
+  // phases: init | loading | ready | recording | transcribing | edit | parsing | review | error
+  const [phase, setPhase] = useStateVE('init');
+  const [progress, setProgress] = useStateVE(0);
+  const [progressFile, setProgressFile] = useStateVE('');
   const [transcript, setTranscript] = useStateVE('');
-  const [interim, setInterim] = useStateVE('');
   const [parsed, setParsed] = useStateVE(null);
-  const [aiUsed, setAiUsed] = useStateVE(false);
-  const [errMsg, setErrMsg] = useStateVE(null);
+  const [errMsg, setErrMsg] = useStateVE('');
   const [seconds, setSeconds] = useStateVE(0);
   const [lang, setLangState] = useStateVE(() => localStorage.getItem(VOICE_LANG_KEY) || 'zh-CN');
 
-  function setLang(l) {
-    localStorage.setItem(VOICE_LANG_KEY, l);
-    setLangState(l);
-  }
+  const pipeRef   = useRefVE(null);
+  const recRef    = useRefVE(null);   // MediaRecorder
+  const streamRef = useRefVE(null);
+  const chunksRef = useRefVE([]);
+  const timerRef  = useRefVE(null);
 
-  const recogRef = useRefVE(null);
-  const timerRef = useRefVE(null);
-  const finalTextRef = useRefVE('');
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const supported = !!SpeechRecognition;
+  function setLang(l) { localStorage.setItem(VOICE_LANG_KEY, l); setLangState(l); }
 
   useEffectVE(() => {
+    loadWhisper();
     return () => {
       stopTimer();
-      try { recogRef.current?.abort(); } catch {}
+      streamRef.current?.getTracks().forEach(t => t.stop());
     };
   }, []);
+
+  async function loadWhisper() {
+    try {
+      setPhase('loading');
+      const mod = await waitForHF();
+      pipeRef.current = await mod.pipeline(
+        'automatic-speech-recognition',
+        WHISPER_MODEL,
+        {
+          progress_callback: (p) => {
+            if (p.status === 'progress' && p.progress != null) {
+              setProgress(Math.round(p.progress));
+              setProgressFile(p.file || '');
+            }
+          },
+        }
+      );
+      setPhase('ready');
+    } catch (e) {
+      setErrMsg(e.message);
+      setPhase('error');
+    }
+  }
 
   function stopTimer() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }
 
-  function startRecording() {
-    if (!supported) {
-      setErrMsg('Speech recognition requires Chrome or Edge browser.');
-      return;
-    }
-    setErrMsg(null);
-    setInterim('');
-    finalTextRef.current = '';
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = lang;
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const rec = new MediaRecorder(stream);
+      recRef.current = rec;
+      rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      rec.onstop = handleRecordingStop;
+      rec.start(200);
       setPhase('recording');
       setSeconds(0);
       timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
-    };
-
-    recognition.onresult = (event) => {
-      let accFinal = '';
-      let accInterim = '';
-      for (let i = 0; i < event.results.length; i++) {
-        if (event.results[i].isFinal) accFinal += event.results[i][0].transcript + ' ';
-        else accInterim += event.results[i][0].transcript;
-      }
-      finalTextRef.current = accFinal.trim();
-      setInterim(accInterim || accFinal.trim());
-    };
-
-    recognition.onerror = (event) => {
-      stopTimer();
-      if (event.error === 'not-allowed') {
-        setErrMsg('Microphone access denied — please allow mic permission.');
-      } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
-        setErrMsg('Recording error: ' + event.error);
-      }
-      setPhase('idle');
-    };
-
-    recogRef.current = recognition;
-    recognition.start();
+    } catch (e) {
+      setErrMsg('Microphone access denied — please allow mic permission.');
+    }
   }
 
   function stopRecording() {
     stopTimer();
-    setInterim('');
-    try { recogRef.current?.stop(); } catch {}
-
-    const text = finalTextRef.current.trim();
-    if (!text) {
-      setErrMsg('Nothing detected — try speaking closer to the mic.');
-      setPhase('idle');
-      return;
-    }
-    setTranscript(text);
-    setPhase('parsing');
-    doParse(text);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    recRef.current?.stop();
+    setPhase('transcribing');
   }
 
-  async function doParse(text) {
-    if (authToken) {
-      try {
-        const r = await fetch(`${API}/ai/parse-round`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-          body: JSON.stringify({ transcript: text, players, mode: settings.mode }),
-          signal: AbortSignal.timeout(65000),
-        });
-        if (r.ok) {
-          const { parsed: aiParsed } = await r.json();
-          const bonuses = toRoundEntryBonuses(aiParsed.bonuses, settings.mode);
-          setParsed({
-            winnerIdx: aiParsed.winnerIdx ?? null,
-            fan: aiParsed.fan ?? settings.minFan,
-            outcome: aiParsed.outcome || 'self',
-            discarderIdx: aiParsed.discarderIdx ?? null,
-            bonuses,
-          });
-          setAiUsed(true);
-          setPhase('review');
-          return;
-        }
-      } catch {}
-    }
+  async function handleRecordingStop() {
+    try {
+      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioCtx = new AudioContext({ sampleRate: 16000 });
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      await audioCtx.close();
+      const float32 = decoded.getChannelData(0);
 
-    const fallback = parseRoundFallback(text, players, settings);
-    setParsed({ ...fallback, bonuses: toRoundEntryBonuses(fallback.bonuses, settings.mode) });
-    setAiUsed(false);
-    setPhase('review');
+      const whisperLang = LANG_OPTIONS.find(l => l.code === lang)?.whisper || 'chinese';
+      const result = await pipeRef.current(float32, {
+        language: whisperLang,
+        task: 'transcribe',
+        return_timestamps: false,
+      });
+      const text = (result.text || '').trim();
+      if (!text) {
+        setErrMsg('Nothing detected — try again.');
+        setPhase('ready');
+        return;
+      }
+      setTranscript(text);
+      setPhase('edit');
+    } catch (e) {
+      setErrMsg('Transcription failed: ' + e.message);
+      setPhase('ready');
+    }
+  }
+
+  async function doParse() {
+    setPhase('parsing');
+    try {
+      const r = await fetch(`${API}/ai/parse-round`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ transcript, players, mode: settings.mode }),
+        signal: AbortSignal.timeout(65000),
+      });
+      if (!r.ok) throw new Error('AI unavailable');
+      const { parsed: aiParsed } = await r.json();
+      setParsed({
+        winnerIdx:    aiParsed.winnerIdx ?? null,
+        fan:          aiParsed.fan ?? settings.minFan,
+        outcome:      aiParsed.outcome || 'self',
+        discarderIdx: aiParsed.discarderIdx ?? null,
+        bonuses:      toRoundEntryBonuses(aiParsed.bonuses, settings.mode),
+      });
+      setPhase('review');
+    } catch (e) {
+      setErrMsg('AI parse failed: ' + e.message + ' — edit the transcript and try again.');
+      setPhase('edit');
+    }
   }
 
   function retry() {
-    setPhase('idle');
     setTranscript('');
-    setInterim('');
     setParsed(null);
-    setErrMsg(null);
-    setAiUsed(false);
-    finalTextRef.current = '';
+    setErrMsg('');
+    setPhase('ready');
   }
 
   const seatLabels = settings.mode === 3
     ? [t.east, t.south, t.west]
     : [t.east, t.south, t.west, t.north];
 
-  const hasAnyStat = parsed && parsed.bonuses && parsed.bonuses.some(b => b.flowers || b.flies || b.openKongs || b.closedKongs);
+  const hasAnyStat = parsed?.bonuses?.some(b => b.flowers || b.flies || b.openKongs || b.closedKongs);
+
+  const langLabel = LANG_OPTIONS.find(l => l.code === lang)?.label || '中文';
 
   return (
     <div className="sheet-backdrop" style={{ zIndex: 200 }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -213,73 +197,112 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
             </div>
           )}
 
-          {/* Idle */}
-          {phase === 'idle' && (
+          {/* Loading Whisper */}
+          {(phase === 'init' || phase === 'loading') && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <div style={{ fontSize: 32, marginBottom: 14 }}>🧠</div>
+              <div style={{ fontSize: 14, color: 'var(--cream)', marginBottom: 6 }}>Loading Whisper…</div>
+              {progress > 0 && (
+                <>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                    {progressFile && <span>{progressFile.split('/').pop()} · </span>}
+                    {progress}%
+                  </div>
+                  <div style={{ background: 'var(--felt-3)', borderRadius: 4, height: 6, width: '80%', margin: '0 auto' }}>
+                    <div style={{ background: 'var(--gold)', height: '100%', borderRadius: 4, width: progress + '%', transition: 'width 0.3s' }} />
+                  </div>
+                </>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 14 }}>
+                First load ~75MB — cached after that
+              </div>
+            </div>
+          )}
+
+          {/* Ready */}
+          {phase === 'ready' && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              {/* Language selector */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 20 }}>
                 {LANG_OPTIONS.map(l => (
-                  <button
-                    key={l.code}
-                    onClick={() => setLang(l.code)}
-                    style={{
-                      padding: '5px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
-                      background: lang === l.code ? 'var(--gold)' : 'var(--felt-2)',
-                      color: lang === l.code ? 'var(--felt-1)' : 'var(--muted)',
-                      border: '1px solid ' + (lang === l.code ? 'var(--gold)' : 'var(--felt-line)'),
-                      fontWeight: lang === l.code ? 700 : 400,
-                    }}
-                  >{l.label}</button>
+                  <button key={l.code} onClick={() => setLang(l.code)} style={{
+                    padding: '5px 14px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
+                    background: lang === l.code ? 'var(--gold)' : 'var(--felt-2)',
+                    color: lang === l.code ? 'var(--felt-1)' : 'var(--muted)',
+                    border: '1px solid ' + (lang === l.code ? 'var(--gold)' : 'var(--felt-line)'),
+                    fontWeight: lang === l.code ? 700 : 400,
+                  }}>{l.label}</button>
                 ))}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6, lineHeight: 1.7 }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 24, opacity: 0.7, lineHeight: 1.7 }}>
                 {lang === 'zh-CN'
-                  ? '说出赢家、番数和结果'
-                  : lang === 'ms-MY'
-                  ? 'Sebut pemenang, fan, dan hasilnya'
-                  : 'Say who won, fans, and outcome'}
+                  ? <>「Alice赢了8番自摸，Bob有2朵花」<br />「Bob赢5番，Carol打出」</>
+                  : <>「Alice won 8 fans self draw, Bob 2 flowers」<br />「Bob wins 5 fans, discard by Carol」</>}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 28, opacity: 0.65, lineHeight: 1.7 }}>
-                {lang === 'zh-CN'
-                  ? <>「Alice赢了8番自摸」<br />「Bob赢了5番，Carol打出」</>
-                  : <>「Alice won 8 fans self draw」<br />「Bob wins 5 fans, discard by Carol」</>}
-              </div>
-              <button
-                className="voice-mic-btn"
-                onClick={supported ? startRecording : undefined}
-                disabled={!supported}
-              >🎙</button>
+              <button className="voice-mic-btn" onClick={startRecording}>🎙</button>
               <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>
-                {supported ? (lang === 'zh-CN' ? '点击录音' : 'Tap to record') : 'Use Chrome or Edge'}
+                {lang === 'zh-CN' ? '点击录音' : 'Tap to record'}
               </div>
-              {authToken && (
-                <div style={{ marginTop: 10, fontSize: 11, color: 'var(--gold)', opacity: 0.8 }}>✦ AI parsing active</div>
-              )}
             </div>
           )}
 
           {/* Recording */}
           {phase === 'recording' && (
-            <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <div style={{ fontSize: 13, color: 'var(--red)', fontWeight: 700, marginBottom: 12, letterSpacing: '0.04em' }}>
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ fontSize: 13, color: 'var(--red)', fontWeight: 700, marginBottom: 16, letterSpacing: '0.06em' }}>
                 ● REC · {seconds}s
               </div>
-              {interim && (
-                <div style={{ fontSize: 12, color: 'var(--cream-dim)', fontStyle: 'italic', marginBottom: 18, minHeight: 36, lineHeight: 1.5, padding: '0 16px' }}>
-                  "{interim}"
-                </div>
-              )}
               <button className="voice-mic-btn recording" onClick={stopRecording}>⏹</button>
-              <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>Tap to stop</div>
+              <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>
+                {lang === 'zh-CN' ? '点击停止' : 'Tap to stop'}
+              </div>
+            </div>
+          )}
+
+          {/* Transcribing */}
+          {phase === 'transcribing' && (
+            <div style={{ textAlign: 'center', padding: '36px 0' }}>
+              <div style={{ fontSize: 32, marginBottom: 14 }}>🎙→📝</div>
+              <div style={{ fontSize: 14, color: 'var(--muted)' }}>
+                {lang === 'zh-CN' ? '转录中…' : 'Transcribing…'}
+              </div>
+            </div>
+          )}
+
+          {/* Edit transcript */}
+          {phase === 'edit' && (
+            <div>
+              <div className="section-title" style={{ marginBottom: 8 }}>
+                {lang === 'zh-CN' ? '听到的内容 — 可以修改' : 'Transcript — edit if needed'}
+              </div>
+              <textarea
+                value={transcript}
+                onChange={e => setTranscript(e.target.value)}
+                rows={4}
+                autoFocus
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'var(--felt-2)', color: 'var(--cream)',
+                  border: '1px solid var(--felt-line)', borderRadius: 10,
+                  padding: '10px 12px', fontSize: 15, lineHeight: 1.6,
+                  resize: 'none', fontFamily: 'inherit',
+                }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+                {lang === 'zh-CN'
+                  ? '修正任何错误，然后点击解析。'
+                  : 'Correct any errors above, then tap Parse.'}
+              </div>
             </div>
           )}
 
           {/* Parsing */}
           {phase === 'parsing' && (
             <div style={{ textAlign: 'center', padding: '36px 0' }}>
-              <div style={{ fontSize: 38, marginBottom: 14 }}>📝→🧠</div>
-              <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 8 }}>Parsing round…</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.6 }}>"{transcript}"</div>
+              <div style={{ fontSize: 32, marginBottom: 14 }}>📝→🧠</div>
+              <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 8 }}>
+                {lang === 'zh-CN' ? 'AI解析中…' : 'AI parsing…'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.6, padding: '0 16px' }}>"{transcript}"</div>
             </div>
           )}
 
@@ -289,31 +312,29 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
               <div style={{ background: 'var(--felt-2)', borderRadius: 8, padding: '10px 14px', marginBottom: 4, fontSize: 12, color: 'var(--cream-dim)', fontStyle: 'italic', lineHeight: 1.5 }}>
                 "{transcript}"
               </div>
-              <div style={{ fontSize: 10, color: aiUsed ? 'var(--gold)' : 'var(--muted)', marginBottom: 18, textAlign: 'right', opacity: 0.8 }}>
-                {aiUsed ? '✦ AI parsed' : '⚙ Regex fallback'}
-              </div>
+              <div style={{ fontSize: 10, color: 'var(--gold)', marginBottom: 18, textAlign: 'right', opacity: 0.8 }}>✦ AI parsed</div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
                 <div className="field-row">
-                  <div className="label">Winner</div>
+                  <div className="label">{lang === 'zh-CN' ? '赢家' : 'Winner'}</div>
                   <div style={{ fontWeight: 600, color: parsed.winnerIdx != null ? 'var(--cream)' : 'var(--red)' }}>
                     {parsed.winnerIdx != null ? `${players[parsed.winnerIdx]} (${seatLabels[parsed.winnerIdx]})` : '⚠ Not detected'}
                   </div>
                 </div>
                 <div className="field-row">
-                  <div className="label">Fan</div>
+                  <div className="label">{lang === 'zh-CN' ? '番数' : 'Fan'}</div>
                   <div style={{ fontWeight: 700, fontFamily: 'var(--mono)', fontSize: 17, color: parsed.fan >= settings.maxFan ? 'var(--red)' : 'var(--gold)' }}>
                     {parsed.fan >= settings.maxFan ? `爆 (${parsed.fan})` : parsed.fan}
                   </div>
                 </div>
                 <div className="field-row">
-                  <div className="label">Outcome</div>
+                  <div className="label">{lang === 'zh-CN' ? '结果' : 'Outcome'}</div>
                   <div style={{ color: 'var(--cream)' }}>{parsed.outcome === 'self' ? t.selfDraw : t.discard}</div>
                 </div>
                 {parsed.outcome === 'discard' && (
                   <div className="field-row">
-                    <div className="label">Discarder</div>
-                    <div style={{ fontWeight: parsed.discarderIdx == null ? 600 : 400, color: parsed.discarderIdx != null ? 'var(--cream)' : 'var(--red)' }}>
+                    <div className="label">{lang === 'zh-CN' ? '放炮' : 'Discarder'}</div>
+                    <div style={{ color: parsed.discarderIdx != null ? 'var(--cream)' : 'var(--red)' }}>
                       {parsed.discarderIdx != null ? `${players[parsed.discarderIdx]} (${seatLabels[parsed.discarderIdx]})` : '⚠ Not detected'}
                     </div>
                   </div>
@@ -322,14 +343,14 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
 
               {hasAnyStat && (
                 <div>
-                  <div className="section-title" style={{ marginBottom: 10 }}>Detected bonuses</div>
+                  <div className="section-title" style={{ marginBottom: 10 }}>{lang === 'zh-CN' ? '奖励' : 'Detected bonuses'}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {parsed.bonuses.map((b, i) => {
                       const bits = [];
-                      if (b.flowers) bits.push(`${b.flowers} 🌸`);
-                      if (b.flies) bits.push(`${b.flies} fly`);
-                      if (b.openKongs) bits.push(`${b.openKongs} open kong`);
-                      if (b.closedKongs) bits.push(`${b.closedKongs} closed kong`);
+                      if (b.flowers)    bits.push(`${b.flowers} 🌸`);
+                      if (b.flies)      bits.push(`${b.flies} 苍蝇`);
+                      if (b.openKongs)  bits.push(`${b.openKongs} 明杠`);
+                      if (b.closedKongs) bits.push(`${b.closedKongs} 暗杠`);
                       if (!bits.length) return null;
                       return (
                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -341,23 +362,49 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
                   </div>
                 </div>
               )}
-
               <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
-                Review and adjust anything on the next screen before saving.
+                {lang === 'zh-CN'
+                  ? '下一屏可以再调整后保存。'
+                  : 'You can adjust anything on the next screen before saving.'}
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          {phase === 'error' && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+                {errMsg || 'Something went wrong.'}
               </div>
             </div>
           )}
 
         </div>
+
         <div className="sheet-footer">
-          {phase === 'review' ? (
+          {phase === 'edit' && (
+            <>
+              <button className="btn btn-secondary" onClick={retry}>Re-record</button>
+              <button
+                className="btn btn-primary btn-block"
+                onClick={doParse}
+                disabled={!transcript.trim()}
+                style={{ opacity: transcript.trim() ? 1 : 0.5 }}
+              >
+                {lang === 'zh-CN' ? 'AI解析 →' : 'Parse with AI →'}
+              </button>
+            </>
+          )}
+          {phase === 'review' && (
             <>
               <button className="btn btn-secondary" onClick={retry}>Retry</button>
               <button className="btn btn-primary btn-block" onClick={() => onParsed(parsed)}>
-                Fill in details →
+                {lang === 'zh-CN' ? '填写详情 →' : 'Fill in details →'}
               </button>
             </>
-          ) : (
+          )}
+          {!['edit', 'review'].includes(phase) && (
             <button className="btn btn-secondary btn-block" onClick={onClose}>{t.cancel}</button>
           )}
         </div>

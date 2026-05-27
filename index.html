@@ -26,6 +26,20 @@
   <!-- Google Identity Services (for Google Sign-In) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
+  <!-- Whisper AI (local speech-to-text via @huggingface/transformers v3) -->
+  <script type="module">
+    try {
+      const mod = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers');
+      mod.env.allowLocalModels = false;
+      mod.env.useBrowserCache = true;
+      window.HFTransformers = mod;
+    } catch (e) {
+      console.warn('[voice] transformers.js failed to load:', e);
+    } finally {
+      document.dispatchEvent(new CustomEvent('hf-ready'));
+    }
+  </script>
+
   <!-- QR code generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA==" crossorigin="anonymous"></script>
   <script src="config.js"></script>
