@@ -2,7 +2,7 @@
 const { useState: useStateVE, useEffect: useEffectVE, useRef: useRefVE } = React;
 
 const API = '/api';
-const WHISPER_MODEL = 'onnx-community/whisper-tiny';
+const WHISPER_MODEL = 'Xenova/whisper-tiny';
 const VOICE_LANG_KEY = 'mahjong-voice-lang';
 
 const LANG_OPTIONS = [

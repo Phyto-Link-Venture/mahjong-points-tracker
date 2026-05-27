@@ -1,4 +1,4 @@
-const CACHE = 'mahjong-v14';
+const CACHE = 'mahjong-v15';
 // CDN hosts that serve Whisper model files — let them manage their own cache
 const BYPASS_HOSTS = ['cdn.jsdelivr.net', 'huggingface.co'];
 const STATIC = [
