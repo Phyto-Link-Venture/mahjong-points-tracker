@@ -1,4 +1,4 @@
-const CACHE = 'mahjong-v9';
+const CACHE = 'mahjong-v10';
 const STATIC = [
   '/', '/index.html', '/styles.css', '/manifest.json',
   '/icon-192.png', '/icon-512.png',
@@ -8,9 +8,6 @@ const STATIC = [
   '/export.jsx', '/auth-modal.jsx', '/stats-view.jsx',
   '/settlement.jsx', '/chart.jsx', '/summary.jsx', '/voice-entry.jsx', '/app.jsx',
 ];
-
-// Domains that manage their own cache (Whisper model files, CDN libs)
-const BYPASS_CACHE_HOSTS = ['cdn.jsdelivr.net', 'huggingface.co'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -30,8 +27,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  // Let external CDN/model hosts manage their own cache
-  if (BYPASS_CACHE_HOSTS.includes(url.hostname)) return;
   // Network-first for API calls
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(fetch(e.request).catch(() => new Response('{"error":"offline"}', { headers: { 'Content-Type': 'application/json' } })));

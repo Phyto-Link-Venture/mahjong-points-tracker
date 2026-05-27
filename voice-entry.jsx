@@ -1,10 +1,8 @@
-// Voice round entry — Whisper (local) for speech-to-text, Gemma (server) for structured parsing
+// Voice round entry — Web Speech API (browser STT) + Ollama server for structured parsing
 const { useState: useStateVE, useEffect: useEffectVE, useRef: useRefVE } = React;
 
-const WHISPER_MODEL = 'Xenova/whisper-tiny';
 const API = '/api';
 
-// Regex fallback parser (used if AI endpoint fails or user not logged in)
 function parseRoundFallback(text, players, settings) {
   const lower = text.toLowerCase().replace(/[.,!?。，！？]/g, ' ');
   const sorted = players
@@ -42,7 +40,6 @@ function parseRoundFallback(text, players, settings) {
   return { winnerIdx, fan, outcome, discarderIdx, bonuses };
 }
 
-// Map AI response into RoundEntry-compatible bonus format
 function toRoundEntryBonuses(aiBonuses, N) {
   return Array(N).fill(null).map((_, i) => {
     const b = (aiBonuses || []).find(x => x.playerIdx === i) || {};
@@ -51,103 +48,95 @@ function toRoundEntryBonuses(aiBonuses, N) {
 }
 
 function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onClose }) {
-  const [phase, setPhase] = useStateVE('init'); // init|loading|ready|recording|transcribing|parsing|review|error
-  const [progress, setProgress] = useStateVE(0);
+  const [phase, setPhase] = useStateVE('idle'); // idle|recording|parsing|review
   const [transcript, setTranscript] = useStateVE('');
+  const [interim, setInterim] = useStateVE('');
   const [parsed, setParsed] = useStateVE(null);
   const [aiUsed, setAiUsed] = useStateVE(false);
   const [errMsg, setErrMsg] = useStateVE(null);
   const [seconds, setSeconds] = useStateVE(0);
 
-  const pipeRef = useRefVE(null);
-  const mrRef = useRefVE(null);
-  const chunksRef = useRefVE([]);
+  const recogRef = useRefVE(null);
   const timerRef = useRefVE(null);
+  const finalTextRef = useRefVE('');
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const supported = !!SpeechRecognition;
 
   useEffectVE(() => {
-    loadWhisper();
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      try { if (mrRef.current?.state === 'recording') mrRef.current.stop(); } catch {}
+      stopTimer();
+      try { recogRef.current?.abort(); } catch {}
     };
   }, []);
 
-  async function loadWhisper() {
-    if (pipeRef.current) { setPhase('ready'); return; }
-    let mod = window.XenovaTransformers;
-    if (!mod) {
-      await new Promise((resolve, reject) => {
-        const t = setTimeout(() => reject(), 8000);
-        document.addEventListener('xenova-ready', () => { clearTimeout(t); resolve(); }, { once: true });
-      }).catch(() => {});
-      mod = window.XenovaTransformers;
-    }
-    if (!mod) { setPhase('error'); setErrMsg('Whisper AI unavailable. Please refresh.'); return; }
-
-    setPhase('loading');
-    try {
-      pipeRef.current = await mod.pipeline('automatic-speech-recognition', WHISPER_MODEL, {
-        progress_callback: p => { if (p.status === 'downloading' && p.total > 0) setProgress(Math.round(p.loaded / p.total * 100)); },
-      });
-      setPhase('ready');
-    } catch (e) {
-      setPhase('error');
-      setErrMsg('Could not load Whisper: ' + (e.message || 'unknown'));
-    }
+  function stopTimer() {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }
 
-  async function startRecording() {
+  function startRecording() {
+    if (!supported) {
+      setErrMsg('Speech recognition requires Chrome or Edge browser.');
+      return;
+    }
     setErrMsg(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      const mr = new MediaRecorder(stream);
-      mrRef.current = mr;
-      chunksRef.current = [];
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = () => { stream.getTracks().forEach(tr => tr.stop()); doTranscribe(); };
-      mr.start(100);
+    setInterim('');
+    finalTextRef.current = '';
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = navigator.language || 'en';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
       setPhase('recording');
       setSeconds(0);
       timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
-    } catch (e) {
-      setErrMsg('Microphone access denied — please allow mic permission.');
-    }
+    };
+
+    recognition.onresult = (event) => {
+      let accFinal = '';
+      let accInterim = '';
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) accFinal += event.results[i][0].transcript + ' ';
+        else accInterim += event.results[i][0].transcript;
+      }
+      finalTextRef.current = accFinal.trim();
+      setInterim(accInterim || accFinal.trim());
+    };
+
+    recognition.onerror = (event) => {
+      stopTimer();
+      if (event.error === 'not-allowed') {
+        setErrMsg('Microphone access denied — please allow mic permission.');
+      } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        setErrMsg('Recording error: ' + event.error);
+      }
+      setPhase('idle');
+    };
+
+    recogRef.current = recognition;
+    recognition.start();
   }
 
   function stopRecording() {
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    try { if (mrRef.current?.state !== 'inactive') mrRef.current.stop(); } catch {}
-    setPhase('transcribing');
-  }
+    stopTimer();
+    setInterim('');
+    try { recogRef.current?.stop(); } catch {}
 
-  async function doTranscribe() {
-    try {
-      const blob = new Blob(chunksRef.current, { type: chunksRef.current[0]?.type || 'audio/webm' });
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-      let decoded;
-      try { decoded = await audioCtx.decodeAudioData(arrayBuffer); } finally { audioCtx.close(); }
-
-      const result = await pipeRef.current(decoded.getChannelData(0), { language: null, task: 'transcribe', return_timestamps: false });
-      const text = (result.text || '').trim();
-
-      if (!text) {
-        setErrMsg('Nothing detected — try speaking closer to the mic.');
-        setPhase('ready');
-        return;
-      }
-
-      setTranscript(text);
-      setPhase('parsing');
-      await doParse(text);
-    } catch (e) {
-      setErrMsg('Transcription failed: ' + (e.message || 'unknown'));
-      setPhase('ready');
+    const text = finalTextRef.current.trim();
+    if (!text) {
+      setErrMsg('Nothing detected — try speaking closer to the mic.');
+      setPhase('idle');
+      return;
     }
+    setTranscript(text);
+    setPhase('parsing');
+    doParse(text);
   }
 
   async function doParse(text) {
-    // Try Gemma on server first
     if (authToken) {
       try {
         const r = await fetch(`${API}/ai/parse-round`, {
@@ -173,14 +162,21 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
       } catch {}
     }
 
-    // Fallback to regex
     const fallback = parseRoundFallback(text, players, settings);
     setParsed({ ...fallback, bonuses: toRoundEntryBonuses(fallback.bonuses, settings.mode) });
     setAiUsed(false);
     setPhase('review');
   }
 
-  function retry() { setPhase('ready'); setTranscript(''); setParsed(null); setErrMsg(null); setAiUsed(false); }
+  function retry() {
+    setPhase('idle');
+    setTranscript('');
+    setInterim('');
+    setParsed(null);
+    setErrMsg(null);
+    setAiUsed(false);
+    finalTextRef.current = '';
+  }
 
   const seatLabels = settings.mode === 3
     ? [t.east, t.south, t.west]
@@ -203,39 +199,26 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
             </div>
           )}
 
-          {/* Downloading Whisper */}
-          {phase === 'loading' && (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: 40, marginBottom: 14 }}>🧠</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--cream)', marginBottom: 6 }}>Downloading Whisper AI</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 18 }}>~77 MB · cached after first download</div>
-              <div style={{ background: 'var(--felt-line)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ background: 'var(--gold)', height: '100%', width: progress + '%', transition: 'width 0.3s', borderRadius: 4 }} />
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{progress}%</div>
-            </div>
-          )}
-
-          {/* Ready */}
-          {(phase === 'ready' || phase === 'init') && (
+          {/* Idle */}
+          {phase === 'idle' && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6, lineHeight: 1.7 }}>
                 Say who won, fans, outcome, and any bonuses.
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 28, opacity: 0.65, lineHeight: 1.7 }}>
-                "Alice won 8 fans self draw, 2 flowers, Bob has 1 open kong"<br />
-                "Bob menang 5 fan, discard oleh Carol, Bob ada 1 flower"
+                "Alice won 8 fans self draw, 2 flowers"<br />
+                "Bob menang 5 fan, discard oleh Carol"
               </div>
               <button
-                className={'voice-mic-btn' + (phase === 'init' ? ' loading' : '')}
-                onClick={phase === 'ready' ? startRecording : undefined}
-                disabled={phase === 'init'}
+                className="voice-mic-btn"
+                onClick={supported ? startRecording : undefined}
+                disabled={!supported}
               >🎙</button>
               <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>
-                {phase === 'init' ? 'Loading Whisper…' : 'Tap to record'}
+                {supported ? 'Tap to record' : 'Use Chrome or Edge'}
               </div>
               {authToken && (
-                <div style={{ marginTop: 10, fontSize: 11, color: 'var(--gold)', opacity: 0.8 }}>✦ Gemma AI parsing active</div>
+                <div style={{ marginTop: 10, fontSize: 11, color: 'var(--gold)', opacity: 0.8 }}>✦ AI parsing active</div>
               )}
             </div>
           )}
@@ -243,45 +226,38 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
           {/* Recording */}
           {phase === 'recording' && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <div style={{ fontSize: 13, color: 'var(--red)', fontWeight: 700, marginBottom: 24, letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 13, color: 'var(--red)', fontWeight: 700, marginBottom: 12, letterSpacing: '0.04em' }}>
                 ● REC · {seconds}s
               </div>
+              {interim && (
+                <div style={{ fontSize: 12, color: 'var(--cream-dim)', fontStyle: 'italic', marginBottom: 18, minHeight: 36, lineHeight: 1.5, padding: '0 16px' }}>
+                  "{interim}"
+                </div>
+              )}
               <button className="voice-mic-btn recording" onClick={stopRecording}>⏹</button>
               <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)' }}>Tap to stop</div>
             </div>
           )}
 
-          {/* Transcribing */}
-          {phase === 'transcribing' && (
-            <div style={{ textAlign: 'center', padding: '36px 0' }}>
-              <div style={{ fontSize: 38, marginBottom: 14 }}>🎙→📝</div>
-              <div style={{ fontSize: 14, color: 'var(--muted)' }}>Transcribing with Whisper…</div>
-            </div>
-          )}
-
-          {/* AI Parsing */}
+          {/* Parsing */}
           {phase === 'parsing' && (
             <div style={{ textAlign: 'center', padding: '36px 0' }}>
               <div style={{ fontSize: 38, marginBottom: 14 }}>📝→🧠</div>
-              <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 8 }}>Gemma is reading the round…</div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.6 }}>
-                "{transcript}"
-              </div>
+              <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 8 }}>Parsing round…</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', opacity: 0.6 }}>"{transcript}"</div>
             </div>
           )}
 
           {/* Review */}
           {phase === 'review' && parsed && (
             <div>
-              {/* Transcript */}
               <div style={{ background: 'var(--felt-2)', borderRadius: 8, padding: '10px 14px', marginBottom: 4, fontSize: 12, color: 'var(--cream-dim)', fontStyle: 'italic', lineHeight: 1.5 }}>
                 "{transcript}"
               </div>
               <div style={{ fontSize: 10, color: aiUsed ? 'var(--gold)' : 'var(--muted)', marginBottom: 18, textAlign: 'right', opacity: 0.8 }}>
-                {aiUsed ? '✦ Gemma AI' : '⚙ Regex fallback'}
+                {aiUsed ? '✦ AI parsed' : '⚙ Regex fallback'}
               </div>
 
-              {/* Core round info */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
                 <div className="field-row">
                   <div className="label">Winner</div>
@@ -309,7 +285,6 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
                 )}
               </div>
 
-              {/* Bonuses (only show if any detected) */}
               {hasAnyStat && (
                 <div>
                   <div className="section-title" style={{ marginBottom: 10 }}>Detected bonuses</div>
@@ -334,16 +309,6 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
 
               <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
                 Review and adjust anything on the next screen before saving.
-              </div>
-            </div>
-          )}
-
-          {/* Hard error */}
-          {phase === 'error' && (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <div style={{ fontSize: 40, marginBottom: 14 }}>⚠️</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
-                AI unavailable.<br />Refresh and try again.
               </div>
             </div>
           )}
