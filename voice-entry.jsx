@@ -69,6 +69,7 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
         'automatic-speech-recognition',
         WHISPER_MODEL,
         {
+          dtype: 'fp32', // Q4/NBits not supported in browser WASM ONNX runtime
           progress_callback: (p) => {
             if (p.status === 'progress' && p.progress != null) {
               setProgress(Math.round(p.progress));
@@ -214,7 +215,7 @@ function VoiceEntry({ t, settings, players, dealerIdx, authToken, onParsed, onCl
                 </>
               )}
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 14 }}>
-                First load ~75MB — cached after that
+                First load ~160MB — cached after that
               </div>
             </div>
           )}
